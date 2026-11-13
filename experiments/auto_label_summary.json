@@ -1,0 +1,62 @@
+[
+  {
+    "label": "20261112-215329_juice_baseline",
+    "target": "juice",
+    "mode": "baseline",
+    "model": "openai/qwen3:14b",
+    "findings": 0,
+    "dup": 0,
+    "tp": 0,
+    "fp": 0,
+    "uncertain": 0,
+    "precision": null,
+    "recall_catalog": 0.0,
+    "catalog_hit": [],
+    "juice_solved": "0/118"
+  },
+  {
+    "label": "20261112-220947_juice_baseline",
+    "target": "juice",
+    "mode": "baseline",
+    "model": "openai/qwen3:14b",
+    "findings": 0,
+    "dup": 0,
+    "tp": 0,
+    "fp": 0,
+    "uncertain": 0,
+    "precision": null,
+    "recall_catalog": 0.0,
+    "catalog_hit": [],
+    "juice_solved": "0/118"
+  },
+  {
+    "label": "20261112-230550_juice_baseline",
+    "target": "juice",
+    "mode": "baseline",
+    "model": "openai/qwen3:32b",
+    "findings": 0,
+    "dup": 0,
+    "tp": 0,
+    "fp": 0,
+    "uncertain": 0,
+    "precision": null,
+    "recall_catalog": 0.0,
+    "catalog_hit": [],
+    "juice_solved": "0/118"
+  },
+  {
+    "label": "20261113-002455_juice_baseline",
+    "target": "juice",
+    "mode": "baseline",
+    "model": "gemini/gemini-2.5-flash",
+    "findings": 0,
+    "dup": 0,
+    "tp": 0,
+    "fp": 0,
+    "uncertain": 0,
+    "precision": null,
+    "recall_catalog": 0.0,
+    "catalog_hit": [],
+    "juice_solved": "1/118"
+  }
+]

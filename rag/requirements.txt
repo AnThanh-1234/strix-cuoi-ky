@@ -1,0 +1,6 @@
+fastembed>=0.7
+numpy
+rank-bm25
+mcp>=1.2,<2
+litellm
+requests

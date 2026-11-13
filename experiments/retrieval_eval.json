@@ -1,0 +1,128 @@
+{
+  "n_queries": 28,
+  "results": [
+    {
+      "mode": "dense",
+      "hit@1": 0.607,
+      "hit@3": 0.786,
+      "hit@5": 0.857,
+      "mrr": 0.695,
+      "misses": [
+        {
+          "query": "DOM sink innerHTML location.hash injection",
+          "got": [
+            "WSTG-CLNT-02",
+            "JavaScript_and_TypeScript_Security_Cheat_Sheet",
+            "Web_Frontend_Security_Cheat_Sheet"
+          ]
+        },
+        {
+          "query": "server fetches attacker supplied URL cloud metadata 169.254.169.254",
+          "got": [
+            "WSTG-INJT-16",
+            "Cross-Site_Request_Forgery_Prevention_Cheat_Sheet",
+            "REST_Security_Cheat_Sheet"
+          ]
+        },
+        {
+          "query": "user can access another user's order by changing the id",
+          "got": [
+            "WSTG-APIT-02",
+            "WSTG-ATHZ-03",
+            "Authorization_Cheat_Sheet"
+          ]
+        },
+        {
+          "query": "verbose stack trace error message disclosure",
+          "got": [
+            "WSTG-APIT-03",
+            "GraphQL_Cheat_Sheet",
+            "CWE-211"
+          ]
+        },
+        {
+          "query": "CWE-79",
+          "got": [
+            "CWE-790",
+            "CWE-792",
+            "CWE-791"
+          ]
+        },
+        {
+          "query": "WSTG-INJT-05",
+          "got": [
+            "05.8-Client-side",
+            "WSTG-INJT-13",
+            "00-API_Testing_Overview"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "bm25",
+      "hit@1": 0.714,
+      "hit@3": 0.929,
+      "hit@5": 0.929,
+      "mrr": 0.804,
+      "misses": [
+        {
+          "query": "how do I fix SQL injection in a login form",
+          "got": [
+            "05.3-SQL_Server",
+            "WSTG-ATHN-04",
+            "Injection_Prevention_Cheat_Sheet"
+          ]
+        },
+        {
+          "query": "../../etc/passwd file read via filename parameter",
+          "got": [
+            "CWE-26",
+            "WSTG-BUSL-09",
+            "11.1-File_Inclusion"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "hybrid",
+      "hit@1": 0.643,
+      "hit@3": 0.857,
+      "hit@5": 0.893,
+      "mrr": 0.753,
+      "misses": [
+        {
+          "query": "how do I fix SQL injection in a login form",
+          "got": [
+            "05.3-SQL_Server",
+            "WSTG-INJT-05",
+            "WSTG-ATHN-04"
+          ]
+        },
+        {
+          "query": "DOM sink innerHTML location.hash injection",
+          "got": [
+            "WSTG-CLNT-02",
+            "WSTG-CLNT-06",
+            "Web_Frontend_Security_Cheat_Sheet"
+          ]
+        },
+        {
+          "query": "verbose stack trace error message disclosure",
+          "got": [
+            "CWE-211",
+            "WSTG-APIT-03",
+            "GraphQL_Cheat_Sheet"
+          ]
+        },
+        {
+          "query": "WSTG-INJT-05",
+          "got": [
+            "WSTG-INJT-13",
+            "05.8-Client-side",
+            "WSTG-IDNT-05"
+          ]
+        }
+      ]
+    }
+  ]
+}

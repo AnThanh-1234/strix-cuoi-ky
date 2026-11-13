@@ -1,0 +1,17 @@
+# Ung dung muc tieu co lo hong san - CHI chay va quet tren may cuc bo.
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: juice-shop
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    mem_limit: 768m
+
+  dvwa:
+    image: vulnerables/web-dvwa:latest
+    container_name: dvwa
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    mem_limit: 512m

@@ -1,0 +1,5 @@
+label,target,mode,model,scan,findings,crit,high,med,low,with_cwe,tokens_in,tokens_out,cost_usd,kb_calls,juice_solved,minutes
+20261112-215329_juice_baseline,juice,baseline,openai/qwen3:14b,quick,0,0,0,0,0,-,81928,2212,0.0,-,0/118,5.1
+20261112-220947_juice_baseline,juice,baseline,openai/qwen3:14b,quick,0,0,0,0,0,-,327712,7870,0.0,-,0/118,14.8
+20261112-230550_juice_baseline,juice,baseline,openai/qwen3:32b,quick,0,0,0,0,0,-,348194,9661,0.0,-,0/118,54.9
+20261113-002455_juice_baseline,juice,baseline,gemini/gemini-2.5-flash,quick,0,0,0,0,0,-,1415246,4532,0.191,-,1/118,16.9

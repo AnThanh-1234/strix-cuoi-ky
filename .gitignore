@@ -1,0 +1,23 @@
+# ===== Bí mật (KHÔNG BAO GIỜ commit) =====
+.env
+*.env
+!*.env.example
+experiments/.env
+experiments/.kaggle_llm
+experiments/kaggle_kernel/
+*.pem
+*.key
+*_token
+.kaggle/
+
+# ===== Dữ liệu / kết quả sinh ra (tạo lại được) =====
+kb/sources/
+kb/index/
+experiments/strix_runs/
+experiments/configs/
+node_modules/
+__pycache__/
+*.pyc
+
+# ===== File tham khảo (không thuộc sản phẩm) =====
+MAU BAOCAO Mon hoc (ThamKhao).docx
