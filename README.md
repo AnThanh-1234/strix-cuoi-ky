@@ -51,7 +51,44 @@ Ghi chú: Strix đã có sẵn 29 *skill* về lỗ hổng (`strix/skills/vulner
 3. Embedding: `BAAI/bge-small-en-v1.5` (384 chiều, chạy ONNX trên CPU qua fastembed, không cần GPU).
 4. Truy xuất **hybrid**: dense (cosine) kết hợp BM25, hợp nhất bằng Reciprocal Rank Fusion. Mỗi tài liệu đóng góp tối đa 2 chunk để kết quả đa dạng.
 
-## 3. Cài đặt (đã thực hiện trên máy này)
+## 3. RAG đóng góp gì cho quá trình test của Strix
+
+[Strix](https://github.com/usestrix/strix) test theo luồng: **Recon → Lập kế hoạch → Khai thác từng loại lỗi → Báo cáo**. RAG cắm vào luồng này ở hai điểm:
+
+```
+Recon → Lập kế hoạch → Khai thác từng loại lỗi → Báo cáo → finish
+                              │                       │
+                          (RAG mức 2)             (RAG mức 2 + mức 1)
+                        tra WSTG cách test      tra Cheat Sheet + CWE
+                        trước khi test          trước khi báo cáo
+```
+
+### Mức 2 — trong lúc quét (MCP server `owasp_kb`, [rag/mcp_server.py](rag/mcp_server.py))
+
+Agent của Strix gọi được các công cụ sau **ngay khi đang test**:
+
+| Công cụ | Gọi khi nào | Đóng góp | Nguồn tri thức |
+|---|---|---|---|
+| `search_security_kb(source="wstg")` | Trước khi test một loại lỗi | Lấy **quy trình kiểm thử chuẩn** + gợi ý payload → test đúng cách, đỡ bỏ sót | [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) |
+| `search_security_kb(source="cheatsheet")` + `get_cwe` | Trước khi báo cáo một finding | Xác định đúng **CWE**, **nguyên nhân gốc**, **cách khắc phục** | [OWASP Cheat Sheets](https://cheatsheetseries.owasp.org/) · [MITRE CWE](https://cwe.mitre.org/) |
+| `lookup_cve` | Khi nhận diện thư viện/phiên bản | Bắt **lỗi mới** của đúng component | [NVD CVE](https://nvd.nist.gov/) |
+
+### Mức 1 — sau khi quét ([rag/enrich_report.py](rag/enrich_report.py))
+
+Đọc báo cáo Strix → với mỗi lỗ hổng, truy xuất tài liệu liên quan → để LLM viết lại phân tích **có trích dẫn nguồn `[S#]`** (bản chất, ảnh hưởng, khắc phục, cách kiểm chứng lại), kèm bước **đánh giá false positive** dựa trên evidence đối chiếu định nghĩa CWE.
+
+### Tóm lại RAG đóng góp
+
+1. **Cách test đúng chuẩn** (WSTG) — hướng dẫn agent kiểm thử từng loại lỗi.
+2. **Phân loại & phân tích chính xác** — đúng CWE, đúng nguyên nhân gốc.
+3. **Khắc phục có nguồn trích dẫn** — báo cáo đáng tin, không "bịa".
+4. **Bắt lỗi mới** — qua tra CVE trực tiếp.
+5. **Cập nhật được** — dựng lại index khi nguồn đổi, không phải sửa prompt Strix.
+6. **Giảm phụ thuộc trí nhớ model** — kiến thức lấy từ nguồn tin cậy.
+
+> **Lưu ý trung thực:** đây là đóng góp *theo thiết kế*. Về bản chất RAG thêm *kiến thức*, không thêm *năng lực thực thi* của agent — nên nhiều khả năng cải thiện **chất lượng phân tích & báo cáo** rõ hơn **số lỗi tìm ra**. Tác động thực được định lượng qua so sánh **baseline vs rag** (file `kb_tool_calls.jsonl` cho biết agent thực sự tra KB bao nhiêu lần). Tích hợp qua [Model Context Protocol](https://modelcontextprotocol.io/) nên **không phải sửa mã nguồn Strix**.
+
+## 4. Cài đặt (đã thực hiện trên máy này)
 
 | Thành phần | Vị trí |
 |---|---|
@@ -73,7 +110,7 @@ uv pip install -r rag/requirements.txt
 bash rag/fetch_sources.sh && python rag/build_index.py
 ```
 
-## 4. Sử dụng
+## 5. Sử dụng
 
 Mở terminal Ubuntu (WSL), chạy `cd /mnt/d/cac_mon_hoc/ATTT && . ~/.venvs/attt-rag/bin/activate`, rồi:
 
@@ -115,7 +152,70 @@ Strix (WSL) ──HTTPS──► *.trycloudflare.com ──► auth proxy :8000 
 - Strix không biết context window của model nhỏ (mặc định giả định 200k), nên script đặt `STRIX_CONTEXT_FALLBACK_TOKENS=40960`, thu nhỏ ngưỡng nén context, và giới hạn độ dài output của tool.
 - URL tunnel đổi mỗi lần khởi động. Chạy `scripts/kaggle_llm.sh url` để cập nhật lại `.env`.
 
-## 5. Thiết kế thực nghiệm
+## 6. Danh sách lỗ hổng mục tiêu (ground truth)
+
+Đây là các lỗ hổng **đã biết** của hai ứng dụng mục tiêu, dùng làm chuẩn đối chiếu để tính **recall** và chấm TP tự động. Nguồn đầy đủ: [targets/ground_truth.json](targets/ground_truth.json).
+
+> Lưu ý: đây **không** phải danh sách Strix chắc chắn tìm ra, mà là các lỗ hổng *có thật* trong ứng dụng. Tỉ lệ Strix phát hiện được trong số này chính là **recall** cần đo. Cột "Loại" dùng tên `vuln_type` trùng với skill của Strix (xem [rag/taxonomy.py](rag/taxonomy.py)).
+
+### 5.1. DVWA — 15 module (mức `security=low`)
+
+| Lỗ hổng | Loại (vuln_type) |
+|---|---|
+| Brute Force (đăng nhập) | authentication, weak_password_detection |
+| Command Injection | rce |
+| CSRF (đổi mật khẩu) | csrf |
+| File Inclusion (LFI/RFI) | path_traversal_lfi_rfi, rce, ssrf |
+| Unrestricted File Upload | insecure_file_uploads, rce |
+| Insecure CAPTCHA | business_logic, authentication, csrf |
+| SQL Injection | sql_injection |
+| Blind SQL Injection | sql_injection |
+| Weak Session IDs | session_management, cryptography |
+| DOM XSS | xss |
+| Reflected XSS | xss |
+| Stored XSS | xss |
+| CSP Bypass | xss, security_headers |
+| Client-side JavaScript tampering | business_logic |
+| Lộ trang setup / phpinfo | information_disclosure, broken_function_level_authorization |
+
+Ngoài ra có 1 mục *generic*: thiếu security header / cờ cookie.
+
+### 5.2. OWASP Juice Shop — 28 nhóm endpoint
+
+| Lỗ hổng | Loại (vuln_type) |
+|---|---|
+| SQLi tại login | sql_injection, authentication |
+| UNION SQLi tại tìm kiếm sản phẩm | sql_injection, xss |
+| Xem/sửa giỏ hàng người khác | idor, broken_function_level_authorization, mass_assignment |
+| Feedback: giả mạo tác giả, XSS, xóa 5 sao | idor, xss, broken_function_level_authorization, mass_assignment, business_logic |
+| Đăng ký với role admin (mass assignment) | mass_assignment, broken_function_level_authorization, xss, information_disclosure |
+| Lộ danh sách user / thông tin nhạy cảm | information_disclosure, broken_function_level_authorization |
+| Đổi mật khẩu không cần mật khẩu cũ / CSRF | csrf, authentication, business_logic |
+| Reset mật khẩu bằng câu hỏi bảo mật yếu | authentication, weak_password_detection, business_logic |
+| JWT unsigned/forged, lộ token | authentication_jwt, authentication |
+| Thư mục /ftp lộ file, poison null byte | information_disclosure, path_traversal_lfi_rfi, broken_function_level_authorization |
+| Open redirect (bypass allowlist) | open_redirect |
+| Upload: XXE, sai kích thước/loại file | xxe, insecure_file_uploads, insecure_deserialization |
+| SSRF qua URL ảnh đại diện | ssrf, ssti, xss, csrf |
+| NoSQL injection / giả mạo review | nosql_injection, idor, broken_function_level_authorization, mass_assignment |
+| Track order: XSS / NoSQL | xss, nosql_injection |
+| B2B orders: RCE / deserialization / XXE | rce, insecure_deserialization, xxe |
+| Prometheus /metrics lộ ra ngoài | information_disclosure, logging_monitoring |
+| Swagger /api-docs lộ API nội bộ | information_disclosure, api_security |
+| Lộ khóa mã hóa / support logs | information_disclosure, cryptography, logging_monitoring |
+| Truy cập trang admin / administration | broken_function_level_authorization, information_disclosure |
+| Stored XSS qua header True-Client-IP | xss, header_injection |
+| DOM XSS tại thanh tìm kiếm (#/search?q=) | xss |
+| IDOR địa chỉ / thẻ thanh toán / đơn hàng | idor, broken_function_level_authorization, business_logic |
+| Coupon / deluxe membership / logic thanh toán | business_logic, race_conditions |
+| Anti-automation: captcha tại feedback | business_logic, authentication |
+| Thư viện lỗi thời (package.json.bak, typosquatting) | vulnerable_components, information_disclosure |
+| Chatbot / lạm dụng prompt | business_logic, llm_prompt_injection, rce |
+| Photo wall / memories upload | insecure_file_uploads, xss, idor |
+
+Ngoài ra có 2 mục *generic*: lỗi lộ stack trace, và CORS `*` / thiếu security header. Danh sách này chưa phủ hết 118 challenge của Juice Shop (xem Hạn chế ở mục 6).
+
+## 7. Thiết kế thực nghiệm
 
 **Biến độc lập:** chế độ (`baseline` / `rag`) × model (API lớn / model nhỏ local) × mục tiêu (Juice Shop / DVWA).
 Mỗi cấu hình nên chạy ít nhất 2 lần, vì agent LLM cho kết quả khác nhau giữa các lần chạy.
@@ -141,7 +241,7 @@ Mỗi cấu hình nên chạy ít nhất 2 lần, vì agent LLM cho kết quả 
 
 **Hạn chế cần nêu trong báo cáo:** danh sách lỗi Juice Shop được tổng hợp từ tài liệu *Pwning OWASP Juice Shop*, chưa đầy đủ 118 challenge. Giám khảo LLM vẫn có thể sai, nên luôn báo cáo kèm các chỉ số kiểm định. Juice Shop và DVWA nổi tiếng nên có thể đã nằm trong dữ liệu huấn luyện của LLM. Nên bổ sung một app nhỏ tự viết, có lỗi cài sẵn, để kiểm tra khả năng tìm lỗi mà model chưa từng thấy.
 
-## 6. Cấu trúc thư mục
+## 8. Cấu trúc thư mục
 
 ```
 targets/docker-compose.yml     Juice Shop + DVWA
@@ -158,7 +258,7 @@ experiments/                   .env, runs.csv, strix_runs/, metrics.csv, labels.
 kb/sources, kb/index           dữ liệu nguồn và index (tạo lại được)
 ```
 
-## 7. Bí mật (không commit)
+## 9. Bí mật (không commit)
 
 | Bí mật | Vị trí |
 |---|---|

@@ -3,3 +3,11 @@ label,target,mode,model,scan,findings,crit,high,med,low,with_cwe,tokens_in,token
 20261112-220947_juice_baseline,juice,baseline,openai/qwen3:14b,quick,0,0,0,0,0,-,327712,7870,0.0,-,0/118,14.8
 20261112-230550_juice_baseline,juice,baseline,openai/qwen3:32b,quick,0,0,0,0,0,-,348194,9661,0.0,-,0/118,54.9
 20261113-002455_juice_baseline,juice,baseline,gemini/gemini-2.5-flash,quick,0,0,0,0,0,-,1415246,4532,0.191,-,1/118,16.9
+20261118-003520_juice_baseline,juice,baseline,gemini/gemini-2.5-flash,quick,3,1,1,1,0,100%,22505007,64863,1.159,-,3/118,24.9
+20261118-010139_juice_rag,juice,rag,gemini/gemini-2.5-flash,quick,2,1,1,0,0,100%,16782270,38799,0.868,0,4/118,18.3
+20261118-012015_dvwa_baseline,dvwa,baseline,gemini/gemini-2.5-flash,quick,0,0,0,0,0,-,548824,1821,0.05,-,-,13.4
+20261118-013354_dvwa_rag,dvwa,rag,gemini/gemini-2.5-flash,quick,0,0,0,0,0,-,,,0.0,0,-,8.1
+20261118-045853_juice_rag,juice,rag,gemini/gemini-2.5-flash,quick,0,0,0,0,0,-,,,0.0,0,0/118,8.2
+20261118-050925_juice_rag,juice,rag,gemini/gemini-2.5-flash,quick,0,0,0,0,0,-,,,0.0,0,0/118,2.9
+20261118-193812_juice_rag,juice,rag,openai/gemini-2.5-flash,quick,0,0,0,0,0,-,,,0.0,0,0/118,0.3
+20261118-194045_juice_rag,juice,rag,gemini/gemini-3-flash-preview,quick,4,0,0,4,0,100%,16273027,97343,1.829,15,3/118,13.1

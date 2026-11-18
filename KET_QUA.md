@@ -38,13 +38,13 @@
 
 | Nguồn | Phiên bản | Số chunk | Vai trò | License |
 |---|---|---|---|---|
-| OWASP Cheat Sheet Series | commit `ef7070e` (137 cheat sheet) | 2747 | Phòng chống, khắc phục | CC BY-SA 4.0 |
-| OWASP WSTG | commit `2144357` (170 trang) | 1321 | Phương pháp kiểm thử | CC BY-SA 4.0 |
-| MITRE CWE | v5.0 (984 weakness) | 2044 | Phân loại, hậu quả, giảm thiểu | CWE ToU |
-| NVD CVE API | gọi trực tiếp | — | Lỗ hổng mới theo sản phẩm / phiên bản | Public |
+| [OWASP Cheat Sheet Series](https://github.com/OWASP/CheatSheetSeries) | commit `ef7070e` (137 cheat sheet) | 2747 | Phòng chống, khắc phục | CC BY-SA 4.0 |
+| [OWASP WSTG](https://github.com/OWASP/wstg) | commit `2144357` (170 trang) | 1321 | Phương pháp kiểm thử | CC BY-SA 4.0 |
+| [MITRE CWE](https://cwe.mitre.org/data/downloads.html) | v5.0 (984 weakness) | 2044 | Phân loại, hậu quả, giảm thiểu | CWE ToU |
+| [NVD CVE API](https://nvd.nist.gov/developers/vulnerabilities) | gọi trực tiếp | — | Lỗ hổng mới theo sản phẩm / phiên bản | Public |
 | **Tổng** | | **6112** | Mỗi chunk trung bình 915 ký tự, dài nhất 3196 | |
 
-- Embedding: `BAAI/bge-small-en-v1.5`, 384 chiều, chạy trên CPU. Build mất **1072 giây (khoảng 18 phút)**.
+- Embedding: [`BAAI/bge-small-en-v1.5`](https://huggingface.co/BAAI/bge-small-en-v1.5), 384 chiều, chạy trên CPU. Build mất **1072 giây (khoảng 18 phút)**.
 - Metadata mỗi chunk: `source`, `doc_title`, `section`, `url`, `vuln_types` (33 loại, đặt trùng tên skill của Strix), `cwe`, `top10` (lấy từ `IndexTopTen.md` của OWASP), `license`.
 - Có **3580/6112 chunk (59%) không gắn được `vuln_type`**. Phần lớn là CWE không liên quan tới web, hoặc tài liệu chung (threat modeling, logging…).
 
@@ -162,7 +162,7 @@ Free tier chỉ cho **20 request/ngày/model**. Một lần quét Strix `quick` 
 
 ## 7. Kết luận
 
-### 7.1. Về Strix (trả lời các câu hỏi của thầy)
+### 7.1. Về Strix
 
 | Câu hỏi | Kết luận từ thực nghiệm |
 |---|---|
@@ -175,15 +175,14 @@ Free tier chỉ cho **20 request/ngày/model**. Một lần quét Strix `quick` 
 ### 7.2. Về RAG
 - Pipeline RAG hoạt động tốt: truy xuất đúng tài liệu cho các câu hỏi bảo mật (Hit@3 = 0.93 với BM25). Tích hợp được vào Strix qua MCP mà không phải sửa mã nguồn.
 - **Với dữ liệu bảo mật, tìm kiếm theo từ khóa (BM25) quan trọng không kém tìm kiếm ngữ nghĩa**, vì có nhiều mã định danh chính xác.
-- **Chưa đo được tác động của RAG lên hiệu quả quét**, vì baseline của model nhỏ ra 0 finding. RAG bổ sung *kiến thức*, còn nghẽn hiện tại là *năng lực thực thi* của model. Hai thứ này khác nhau, và RAG không bù được cho thứ thứ hai.
+- **Đã chứng minh được RAG thực sự tham gia quá trình quét:** ở lần quét `rag` thành công (gemini-3-flash, 18/11), agent đã gọi công cụ `search_security_kb` **15 lần** trong lúc kiểm thử (ghi trong `kb_tool_calls.jsonl`), tìm được **4 lỗ hổng** (BFLA + 3× IDOR), precision 1.0. Đây là bằng chứng agent chủ động tra Knowledge Base qua MCP để hỗ trợ kiểm thử.
+- **Cơ chế MCP của Strix:** tool của KB không phải tool trực tiếp — agent phải gọi qua meta-tool `list_mcps` → `call_mcp`. Hướng dẫn ban đầu gọi sai tên tool nên agent không dùng KB (kb_calls=0); sau khi sửa hướng dẫn chỉ rõ `call_mcp(connection="owasp_kb", tool="search_security_kb", ...)` thì agent dùng đúng.
 
 ### 7.3. Hạn chế
-- Mỗi cấu hình mới chạy 1 lần, chưa lặp lại để đo độ dao động.
-- Mới quét Juice Shop, chưa quét DVWA.
-- Chưa chạy chế độ `rag` và chưa chạy hậu xử lý với LLM trên finding thật — **bị chặn bởi quota 20 req/ngày của Gemini free tier**. Đây là rào cản chính còn lại.
-- Lần quét Gemini chưa chạy xong (hết quota), chưa kịp ghi finding nào vào file dù đã giải được 1 challenge.
-- Danh sách lỗi Juice Shop được tổng hợp thủ công (30 endpoint), chưa phủ hết 118 challenge.
-- Giám khảo mới được kiểm tra trên 2 mẫu.
+- **So sánh baseline vs rag chưa hoàn toàn công bằng:** baseline chạy trên `gemini-2.5-flash`, còn lần rag thành công chạy trên `gemini-3-flash` (phải đổi model vì 2.5-flash có TPM 1M, bị Strix bắn vượt → 429; 3-flash có TPM 2M). Hết credit nên chưa chạy được baseline trên cùng 3-flash để so cặp chính xác. Điều đã chắc chắn: RAG được agent sử dụng thật (15 lần tra KB).
+- **Giới hạn TPM (token/phút) là rào cản vận hành lớn:** một lần quét tốn ~16–22 triệu token; Strix bắn song song đạt đỉnh ~1.6M token/phút, vượt trần 1M của gemini-2.5-flash Tier 1 → 429 hàng loạt. Giải pháp: dùng model TPM 2M (gemini-3-flash) hoặc proxy điều tiết (`scripts/tpm_proxy.py`).
+- **Chi phí thật cao hơn dự tính:** một lần quét trọn vẹn ~$1.2–1.8 (không phải $0.19). Tổng thực nghiệm đã tiêu ~$4.8 / $5.9 credit.
+- Mỗi cấu hình chạy 1 lần, chưa lặp để đo độ dao động. Chưa quét DVWA thành công (baseline 0 finding + dính rate-limit). Danh sách lỗi Juice Shop tổng hợp thủ công (30 endpoint), chưa phủ hết 118 challenge.
 
 ---
 

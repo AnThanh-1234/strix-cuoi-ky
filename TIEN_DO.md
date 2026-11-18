@@ -28,7 +28,57 @@ Báo cáo              ███████░░░  70%  (bản nháp .docx x
 
 ---
 
-## 2. Công việc đã hoàn thành ✅
+## 2. Quy trình thực hiện (pipeline)
+
+Hướng đồ án: **kiểm thử web black-box** — Strix tấn công ứng dụng đang chạy qua HTTP, không đọc mã nguồn. Mục tiêu đo: **RAG có làm Strix quét tốt hơn không**.
+
+```
+[B1] Môi trường + lab      [B2] Knowledge Base         [B3] Model
+ WSL2 + Docker              clone OWASP/CWE              Kaggle GPU (model nhỏ)
+ Juice Shop :3000           → chunk theo heading         hoặc API (Gemini...)
+ DVWA :8080                 → gắn metadata (CWE,Top10)   → experiments/.env
+                            → embed (bge-small)
+                            → kb/index  +  MCP server
+        │                         │                         │
+        └──────────────┬──────────┴─────────────┬───────────┘
+                       ▼                         ▼
+          [B4] CHẠY THỰC NGHIỆM (mỗi ô: app × {baseline | rag})
+          reset app → Strix quét → thu kết quả:
+             vulnerabilities.json · juice_challenges.json · kb_tool_calls.jsonl · run.json
+                       │
+                       ▼
+          [B5] CHẤM ĐIỂM TỰ ĐỘNG  (auto_label.py)
+          dedup → đối chiếu lỗ hổng đã biết → giám khảo LLM → kiểm định (kappa)
+                       │
+                       ▼
+          [B6] TỔNG HỢP  (collect_metrics.py + enrich_report.py)
+          bảng so sánh baseline vs rag: findings, precision, recall, token, thời gian
+                       │
+                       ▼
+          [B7] BÁO CÁO  (cập nhật Chương 3 + slide)
+```
+
+**Chi tiết từng bước:**
+
+| Bước | Việc | Lệnh / file | Đầu ra |
+|---|---|---|---|
+| B1 | Bật lab | `scripts/lab.sh up` | Juice Shop + DVWA chạy |
+| B2 | Dựng Knowledge Base (làm 1 lần) | `rag/fetch_sources.sh` → `rag/build_index.py` | `kb/index/` (6112 chunk) |
+| B3 | Chuẩn bị model | `scripts/kaggle_llm.sh start` *hoặc* điền key vào `experiments/.env` | `STRIX_LLM` sẵn sàng |
+| B4 | Chạy 1 ô thực nghiệm | `scripts/run_scan.sh <juice\|dvwa> <baseline\|rag> quick 2` | `experiments/strix_runs/<run>/` |
+| B5 | Chấm TP/FP tự động | `experiments/auto_label.py` | `labels_auto.csv`, `auto_label_summary.json` |
+| B6 | Tổng hợp + bổ sung RAG | `experiments/collect_metrics.py`, `rag/enrich_report.py` | `metrics.csv`, `enriched_report.md` |
+| B7 | Viết báo cáo | cập nhật `BAO_CAO_DO_AN.docx` | báo cáo + slide |
+
+**Ma trận thực nghiệm (B4):** `{Juice Shop, DVWA} × {baseline, rag}` = 4 ô, mỗi ô chạy ≥ 2 lần (agent LLM dao động giữa các lần) → tối thiểu 8 lần quét. So cặp **baseline vs rag** trên cùng app/model chính là phép đo "RAG có cải thiện không".
+
+**Điểm khác nhau giữa 2 chế độ:**
+- `baseline`: Strix quét bình thường, không có Knowledge Base.
+- `rag`: Strix được nối thêm MCP server `owasp_kb`; agent tự tra WSTG trước khi test và tra Cheat Sheet/CWE trước khi báo cáo. Mỗi lần tra được ghi vào `kb_tool_calls.jsonl` để biết agent có thực sự dùng RAG không.
+
+---
+
+## 3. Công việc đã hoàn thành ✅
 
 | # | Công việc | Ghi chú |
 |---|---|---|
@@ -47,7 +97,7 @@ Báo cáo              ███████░░░  70%  (bản nháp .docx x
 
 ---
 
-## 3. Đang chờ / bị chặn ⏸️
+## 4. Đang chờ / bị chặn ⏸️
 
 | Công việc | Lý do chặn | Cần gì để gỡ |
 |---|---|---|
@@ -58,7 +108,7 @@ Báo cáo              ███████░░░  70%  (bản nháp .docx x
 
 ---
 
-## 4. Việc cần làm tiếp 📋
+## 5. Việc cần làm tiếp 📋
 
 - [ ] **Bật billing cho key Gemini** (Google AI Studio) — điều kiện bắt buộc
 - [ ] Chạy ma trận `{Juice Shop, DVWA} × {baseline, RAG}`, mỗi ô 2 lần
@@ -71,7 +121,7 @@ Báo cáo              ███████░░░  70%  (bản nháp .docx x
 
 ---
 
-## 5. Nhật ký
+## 6. Nhật ký
 
 | Ngày | Nội dung |
 |---|---|
@@ -81,7 +131,7 @@ Báo cáo              ███████░░░  70%  (bản nháp .docx x
 
 ---
 
-## 6. Ánh xạ kế hoạch 5 tuần
+## 7. Ánh xạ kế hoạch
 
 | Tuần | Kế hoạch | Trạng thái |
 |---|---|---|

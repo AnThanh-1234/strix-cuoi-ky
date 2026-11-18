@@ -58,5 +58,133 @@
     "recall_catalog": 0.0,
     "catalog_hit": [],
     "juice_solved": "1/118"
+  },
+  {
+    "label": "20261118-003520_juice_baseline",
+    "target": "juice",
+    "mode": "baseline",
+    "model": "gemini/gemini-2.5-flash",
+    "findings": 3,
+    "dup": 0,
+    "tp": 2,
+    "fp": 0,
+    "uncertain": 1,
+    "precision": 1.0,
+    "recall_catalog": 0.071,
+    "catalog_hit": [
+      "login_sqli",
+      "search_sqli"
+    ],
+    "juice_solved": "3/118"
+  },
+  {
+    "label": "20261118-010139_juice_rag",
+    "target": "juice",
+    "mode": "rag",
+    "model": "gemini/gemini-2.5-flash",
+    "findings": 2,
+    "dup": 0,
+    "tp": 2,
+    "fp": 0,
+    "uncertain": 0,
+    "precision": 1.0,
+    "recall_catalog": 0.071,
+    "catalog_hit": [
+      "basket_idor",
+      "search_sqli"
+    ],
+    "juice_solved": "4/118"
+  },
+  {
+    "label": "20261118-012015_dvwa_baseline",
+    "target": "dvwa",
+    "mode": "baseline",
+    "model": "gemini/gemini-2.5-flash",
+    "findings": 0,
+    "dup": 0,
+    "tp": 0,
+    "fp": 0,
+    "uncertain": 0,
+    "precision": null,
+    "recall_catalog": 0.0,
+    "catalog_hit": []
+  },
+  {
+    "label": "20261118-013354_dvwa_rag",
+    "target": "dvwa",
+    "mode": "rag",
+    "model": "gemini/gemini-2.5-flash",
+    "findings": 0,
+    "dup": 0,
+    "tp": 0,
+    "fp": 0,
+    "uncertain": 0,
+    "precision": null,
+    "recall_catalog": 0.0,
+    "catalog_hit": []
+  },
+  {
+    "label": "20261118-045853_juice_rag",
+    "target": "juice",
+    "mode": "rag",
+    "model": "gemini/gemini-2.5-flash",
+    "findings": 0,
+    "dup": 0,
+    "tp": 0,
+    "fp": 0,
+    "uncertain": 0,
+    "precision": null,
+    "recall_catalog": 0.0,
+    "catalog_hit": [],
+    "juice_solved": "0/118"
+  },
+  {
+    "label": "20261118-050925_juice_rag",
+    "target": "juice",
+    "mode": "rag",
+    "model": "gemini/gemini-2.5-flash",
+    "findings": 0,
+    "dup": 0,
+    "tp": 0,
+    "fp": 0,
+    "uncertain": 0,
+    "precision": null,
+    "recall_catalog": 0.0,
+    "catalog_hit": [],
+    "juice_solved": "0/118"
+  },
+  {
+    "label": "20261118-193812_juice_rag",
+    "target": "juice",
+    "mode": "rag",
+    "model": "openai/gemini-2.5-flash",
+    "findings": 0,
+    "dup": 0,
+    "tp": 0,
+    "fp": 0,
+    "uncertain": 0,
+    "precision": null,
+    "recall_catalog": 0.0,
+    "catalog_hit": [],
+    "juice_solved": "0/118"
+  },
+  {
+    "label": "20261118-194045_juice_rag",
+    "target": "juice",
+    "mode": "rag",
+    "model": "gemini/gemini-3-flash-preview",
+    "findings": 4,
+    "dup": 0,
+    "tp": 4,
+    "fp": 0,
+    "uncertain": 0,
+    "precision": 1.0,
+    "recall_catalog": 0.107,
+    "catalog_hit": [
+      "address_card",
+      "basket_idor",
+      "register_admin"
+    ],
+    "juice_solved": "3/118"
   }
 ]

@@ -1,6 +1,9 @@
 # ===== Bí mật (KHÔNG BAO GIỜ commit) =====
 .env
 *.env
+*.bak
+*.env.bak
+experiments/.env.bak
 !*.env.example
 experiments/.env
 experiments/.kaggle_llm

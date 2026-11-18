@@ -68,7 +68,7 @@ if [ "$MODE" = "rag" ]; then
   }
 ]
 EOF
-  INSTR="$INSTR You have an MCP knowledge base 'owasp_kb'. Before testing each vulnerability class call search_security_kb with source='wstg' for the OWASP test procedure; before reporting a finding call it with source='cheatsheet' (and get_cwe) to confirm the CWE and remediation, and cite the returned sources. Use lookup_cve for fingerprinted component versions."
+  INSTR="$INSTR MANDATORY: an MCP knowledge base connection named 'owasp_kb' is available this run (OWASP Cheat Sheets, WSTG, MITRE CWE, NVD CVE). You MUST use it via the MCP tools. First call list_mcps to confirm 'owasp_kb' is connected. Then, BEFORE testing each vulnerability class, call call_mcp with connection='owasp_kb', tool='search_security_kb', arguments={\"query\":\"<the vuln, e.g. SQL injection login>\",\"source\":\"wstg\"} to get the official OWASP test procedure. BEFORE filing each vulnerability report, call call_mcp with connection='owasp_kb', tool='search_security_kb', arguments={\"query\":\"<vuln> remediation\",\"source\":\"cheatsheet\"} and call_mcp tool='get_cwe' with arguments={\"cwe_id\":\"CWE-XX\"} to confirm the correct CWE and remediation, and cite these sources in the report. Use call_mcp tool='lookup_cve' for any fingerprinted library/version. Query owasp_kb for every vulnerability class you test."
 elif [ "$MODE" = "baseline" ]; then
   MCP_CFG="$EXP/configs/mcp_none.json"; echo "[]" > "$MCP_CFG"
 else
