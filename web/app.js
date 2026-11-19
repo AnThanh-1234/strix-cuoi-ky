@@ -126,15 +126,23 @@ function navigate(view) {
 // SECTION: Date/Time Formatting
 // =============================================================================
 
-/** Format ISO timestamp to Vietnamese locale string */
+/** Format timestamp (epoch seconds tu Python hoac ISO string) sang gio VN */
 function fmtDate(iso) {
-  if (!iso) return '—';
+  if (iso === null || iso === undefined || iso === '') return '—';
+  let value = iso;
+  // Backend luu time.time() = so giay; new Date() cua JS can so mili-giay.
+  // Neu khong doi se ra ngay 22/01/1970. Gia tri >= 1e12 la mili-giay san.
+  const raw = String(iso);
+  if (/^\d+(\.\d+)?$/.test(raw)) {
+    const n = Number(raw);
+    value = n < 1e12 ? n * 1000 : n;
+  }
   try {
-    return new Date(iso).toLocaleString('vi-VN', {
+    return new Date(value).toLocaleString('vi-VN', {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit', second: '2-digit',
     });
-  } catch (_) { return iso; }
+  } catch (_) { return raw; }
 }
 
 /** Format seconds to hh:mm:ss or mm:ss */

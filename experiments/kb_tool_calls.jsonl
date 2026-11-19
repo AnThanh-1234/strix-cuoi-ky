@@ -13,3 +13,8 @@
 {"ts": "2026-11-18T19:52:30", "run": "20261118-194045_juice_rag", "tool": "search_security_kb", "args": {"query": "SQL injection remediation", "source": null, "vuln_type": null}, "n_results": 5, "ms": 2281}
 {"ts": "2026-11-18T19:52:38", "run": "20261118-194045_juice_rag", "tool": "search_security_kb", "args": {"query": "session invalidation remediation", "source": "cheatsheet", "vuln_type": null}, "n_results": 5, "ms": 137}
 {"ts": "2026-11-18T19:52:46", "run": "20261118-194045_juice_rag", "tool": "search_security_kb", "args": {"query": "SQL injection remediation", "source": "cheatsheet", "vuln_type": null}, "n_results": 5, "ms": 165}
+{"ts": "2026-11-19T20:58:38", "run": "20261119-205639_juice_rag", "tool": "search_security_kb", "args": {"query": "SQL injection login", "source": "wstg", "vuln_type": null}, "n_results": 5, "ms": 578}
+{"ts": "2026-11-19T20:58:42", "run": "20261119-205639_juice_rag", "tool": "search_security_kb", "args": {"query": "Cross-Site Scripting (XSS) how to test", "source": "wstg", "vuln_type": null}, "n_results": 5, "ms": 38}
+{"ts": "2026-11-19T20:58:48", "run": "20261119-205639_juice_rag", "tool": "search_security_kb", "args": {"query": "IDOR how to test", "source": "wstg", "vuln_type": null}, "n_results": 5, "ms": 38}
+{"ts": "2026-11-19T20:58:48", "run": "20261119-205639_juice_rag", "tool": "search_security_kb", "args": {"query": "SQL injection login", "source": "wstg", "vuln_type": null}, "n_results": 5, "ms": 36}
+{"ts": "2026-11-19T20:59:26", "run": "20261119-205639_juice_rag", "tool": "search_security_kb", "args": {"query": "XSS testing", "source": "wstg", "vuln_type": null}, "n_results": 5, "ms": 82}
