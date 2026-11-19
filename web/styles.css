@@ -66,6 +66,11 @@
 .summary-card.low .summary-count { color: #4ade80; }
 .summary-card.info .summary-count { color: #60a5fa; }
 
+/* ── Global hidden rule ─────────────────────────────────────── */
+[hidden] {
+  display: none !important;
+}
+
 /* ── Custom Properties ─────────────────────────────────────── */
 :root {
   --bg:      #0b1020;

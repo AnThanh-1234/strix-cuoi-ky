@@ -615,8 +615,14 @@ async function showScan(scanId, live = false) {
     // Show monitor, hide empty state
     const monitorEl = $('#monitor');
     const emptyEl = $('#emptyMonitor');
-    if (monitorEl) monitorEl.removeAttribute('hidden');
-    if (emptyEl) emptyEl.setAttribute('hidden', '');
+    if (monitorEl) {
+      monitorEl.removeAttribute('hidden');
+      monitorEl.style.display = 'block';
+    }
+    if (emptyEl) {
+      emptyEl.setAttribute('hidden', '');
+      emptyEl.style.display = 'none';
+    }
 
     // Update header fields
     setText('#currentTarget', scan.target_name || scan.target_url || `Scan #${scan.id}`);
