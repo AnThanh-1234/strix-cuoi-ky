@@ -432,7 +432,6 @@ function buildSeveritySummaryHtml(counts) {
 
 async function loadSchedules() {
   try {
-    await loadTargets();
     const schedules = await api('/api/schedules');
     state.schedules = schedules;
 
@@ -1297,13 +1296,6 @@ function setupEventListeners() {
 function init() {
   setupEventListeners();
   navigate('scan');
-
-  // Initial data loads
-  loadTargets();
-  loadHistory();
-  loadSchedules();
-  loadAudit();
-  loadSettings();
 
   // Start polling
   pollActive();

@@ -220,7 +220,7 @@ curl.exe http://127.0.0.1:8765/api/settings
 
 ### Bước 4 — Tạo target và scan trên giao diện
 
-- Vào **Targets** → thêm target (`https://sv.dut.udn.vn/Default.aspx`) → xác nhận authorized.
+- Vào **Targets** → thêm target lab hoặc URL mà bạn đã được chủ hệ thống ủy quyền bằng văn bản → xác nhận authorized.
 - Vào **Scan** → chọn target đó.
 - Chọn:
   - `mode = baseline` hoặc `rag` — **cả hai đều dùng được** (Knowledge Base đã cài, xem mục 5).
@@ -245,7 +245,7 @@ run của Strix ở `experiments/strix_runs/<label>/`.
 > Muốn quay lại log tĩnh: thêm `STRIX_DEBUG=0` vào `experiments/.env`.
 > Lưu ý: lượt scan đang chạy trước khi sửa này vẫn dùng log kiểu cũ.
 
-> ⚠️ Chỉ quét target bạn có quyền kiểm thử chính thức. `sv.dut.udn.vn` là site thật.
+> ⚠️ Chỉ quét target trong phạm vi được chủ hệ thống ủy quyền chính thức. Không dùng ví dụ này cho hệ thống thật nếu chưa có xác nhận bằng văn bản.
 
 ### 3.1. Tạm ngừng / tiếp tục / dừng scan
 

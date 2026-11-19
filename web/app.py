@@ -18,6 +18,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -681,9 +682,6 @@ def report_content(scan: dict, fmt: str) -> tuple[str, str, str]:
                 if key == "references":
                     val = finding.get("references") or finding.get("reference") or "-"
                 lines += [f"### {label}", "", str(val), ""]
-            refs = finding.get("references") or finding.get("reference")
-            if refs:
-                lines += ["### References", "", str(refs), ""]
         return "\n".join(lines), "text/markdown; charset=utf-8", stem + ".md"
     e = html.escape
     rows = []
@@ -768,8 +766,19 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/scans":
             active_only = query.get("active", [""])[0] == "1"
             with connect() as conn:
-                rows = conn.execute("SELECT * FROM scans WHERE status IN ('Queued','Running','Paused') ORDER BY created_at" if active_only else "SELECT * FROM scans ORDER BY created_at DESC LIMIT 300").fetchall()
-            self.send_json([scan_json(row) for row in rows])
+                scan_columns = """id,target_id,target_name,target_url,mode,scan_mode,budget,instruction,
+                  source,schedule_id,status,created_at,started_at,ended_at,paused_at,paused_total,
+                  exit_code,error,run_dir,log_path,findings_json"""
+                if active_only:
+                    placeholders = ",".join("?" for _ in ACTIVE_STATUSES)
+                    rows = conn.execute(
+                        f"SELECT {scan_columns} FROM scans WHERE status IN ({placeholders}) ORDER BY created_at",
+                        ACTIVE_STATUSES,
+                    ).fetchall()
+                    self.send_json([scan_json(row) for row in rows])
+                else:
+                    rows = conn.execute(f"SELECT {scan_columns} FROM scans ORDER BY created_at DESC LIMIT 300").fetchall()
+                    self.send_json([scan_json(row, include_detail=True) for row in rows])
         elif re.fullmatch(r"/api/scans/\d+", path):
             scan_id = int(path.rsplit("/", 1)[1])
             with connect() as conn:
@@ -793,11 +802,6 @@ class Handler(BaseHTTPRequestHandler):
                 return
             scan = scan_json(row, include_detail=True)
             content, ctype, name = report_content(scan, fmt)
-            out = REPORT_DIR / f"scan-{scan_id}-{name}"
-            out.write_text(content, encoding="utf-8")
-            with connect() as conn:
-                conn.execute("INSERT INTO reports(scan_id,format,path,created_at) VALUES(?,?,?,?)", (scan_id, fmt, str(out), time.time()))
-            audit("report.exported", "scan", scan_id, details=f"format={fmt}")
             self._send(content.encode("utf-8"), content_type=ctype, extra={"Content-Disposition": f'attachment; filename="{name}"', "X-File-Name": name})
         elif path == "/api/schedules":
             with connect() as conn:
@@ -867,10 +871,15 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("Chu kỳ phải từ 1 đến 720 giờ.")
                 now = time.time()
                 if schedule_type == "once":
+                    raw = str(data.get("scheduled_for") or "").strip()
                     try:
-                        next_run_at = float(data.get("scheduled_for"))
+                        next_run_at = float(raw)
                     except (TypeError, ValueError) as exc:
-                        raise ValueError("Chọn thời điểm chạy hợp lệ.") from exc
+                        try:
+                            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                            next_run_at = parsed.timestamp()
+                        except (ValueError, OverflowError) as iso_exc:
+                            raise ValueError("Chọn thời điểm chạy hợp lệ.") from iso_exc
                     if not now + 30 <= next_run_at <= now + 365 * 86400:
                         raise ValueError("Thời điểm chạy phải cách hiện tại ít nhất 30 giây và không quá một năm.")
                 else:
