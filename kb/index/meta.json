@@ -1,0 +1,59 @@
+{
+  "embed_model": "BAAI/bge-small-en-v1.5",
+  "dim": 384,
+  "n_chunks": 6112,
+  "by_source": {
+    "cheatsheet": 2747,
+    "wstg": 1321,
+    "cwe": 2044
+  },
+  "by_vuln_type": {
+    "authentication": 274,
+    "xss": 239,
+    "cryptography": 207,
+    "broken_function_level_authorization": 205,
+    "api_security": 133,
+    "vulnerable_components": 128,
+    "session_management": 112,
+    "llm_prompt_injection": 108,
+    "business_logic": 108,
+    "xxe": 108,
+    "information_disclosure": 103,
+    "logging_monitoring": 99,
+    "path_traversal_lfi_rfi": 90,
+    "sql_injection": 82,
+    "security_headers": 81,
+    "csrf": 56,
+    "rce": 55,
+    "insecure_deserialization": 37,
+    "authentication_jwt": 35,
+    "ssrf": 34,
+    "ssti": 28,
+    "ldap_xpath_injection": 26,
+    "weak_password_detection": 26,
+    "mass_assignment": 25,
+    "insecure_file_uploads": 22,
+    "nosql_injection": 20,
+    "header_injection": 20,
+    "race_conditions": 20,
+    "prototype_pollution": 18,
+    "cors": 17,
+    "http_request_smuggling": 13,
+    "open_redirect": 11,
+    "idor": 10
+  },
+  "untyped_chunks": 3580,
+  "chunk_chars": {
+    "mean": 915,
+    "max": 3196
+  },
+  "sources": {
+    "CheatSheetSeries": "ef7070e",
+    "wstg": "2144357",
+    "cwe_xml": [
+      "cwec_v5.0.xml"
+    ]
+  },
+  "built_at": "2026-11-12 21:28:47",
+  "build_seconds": 1072.3
+}
