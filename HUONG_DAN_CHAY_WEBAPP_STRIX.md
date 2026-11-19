@@ -213,7 +213,7 @@ curl.exe http://127.0.0.1:8765/api/settings
 - Vào **Targets** → thêm target (`https://sv.dut.udn.vn/Default.aspx`) → xác nhận authorized.
 - Vào **Scan** → chọn target đó.
 - Chọn:
-  - `mode = baseline` — `rag` **chưa dùng được** vì chưa cài Knowledge Base (xem mục 5).
+  - `mode = baseline` hoặc `rag` — **cả hai đều dùng được** (Knowledge Base đã cài, xem mục 5).
   - `depth = quick`
   - `budget = 1` (USD) để thử nghiệm.
 - Nhấn Scan, theo dõi log trực tiếp trên webapp.
@@ -246,21 +246,47 @@ scripts/run_scan.sh "http://localhost:3000" baseline quick 1
 
 ---
 
-## 5. (Tùy chọn) Cài RAG để dùng `mode = rag`
+## 5. Knowledge Base RAG (đã cài sẵn)
 
-Hiện **chưa cài**. Muốn dùng thì chạy trong WSL:
+KB đã được build xong trong WSL, có thể chọn thẳng `mode = rag` trên webapp.
+
+**Trạng thái hiện tại** (`kb/index/`, ~18 MB):
+
+| Mục | Giá trị |
+|---|---|
+| Model embedding | `BAAI/bge-small-en-v1.5` (384 chiều, chạy CPU, đã cache trong `~/.cache/fastembed`) |
+| Số chunk | **6331** — cheatsheet 2754, WSTG 1533, CWE 2044 |
+| Nguồn | OWASP CheatSheetSeries `c2a1e3e`, OWASP WSTG `5bd51b3`, CWE 5.0 |
+| Thời gian build | ~11 phút (685.7s) |
+
+Test nhanh:
+
+```bash
+source ~/.venvs/attt-rag/bin/activate
+python rag/query.py "how to test JWT none algorithm" --source wstg --brief
+# → [S1] WSTG: JSON Web Tokens > How to Test > Signature Verification > The None Algorithm
+```
+
+Quy trình cài lại từ đầu (chỉ cần nếu xóa `kb/index/`):
 
 ```bash
 uv venv --python 3.12 ~/.venvs/attt-rag
 source ~/.venvs/attt-rag/bin/activate
 uv pip install -r rag/requirements.txt
 bash rag/fetch_sources.sh
-python rag/build_index.py          # ~15-20 phút, khoảng 6100 chunk
-python rag/query.py "how to test JWT none algorithm" --source wstg --brief
+python rag/build_index.py          # ~11 phút, 6331 chunk
 ```
 
-Sau khi có `kb/index/`, chọn `mode = rag` trên webapp. Agent sẽ gọi MCP `owasp_kb`
-qua `call_mcp`; kiểm tra các lần gọi trong `experiments/kb_tool_calls.jsonl`.
+> `rag/fetch_sources.sh` dùng lệnh `unzip`; Ubuntu này không có `unzip` và không có sudo
+> không mật khẩu. Nếu bước CWE báo `unzip: command not found`, file zip đã tải xong —
+> giải nén bằng Python rồi bỏ qua bước đó:
+> ```bash
+> python3 -c 'import zipfile; zipfile.ZipFile("kb/sources/cwec_latest.xml.zip").extractall("kb/sources")'
+> ```
+
+Khi chọn `mode = rag`, `run_scan.sh` tạo file MCP trỏ tới `~/.venvs/attt-rag/bin/python`
+và `rag/mcp_server.py`. Agent gọi qua `call_mcp` (connection `owasp_kb`); kiểm tra các lần
+gọi trong `experiments/kb_tool_calls.jsonl` (`kb_calls` trong bảng kết quả).
 
 ---
 
@@ -274,7 +300,7 @@ qua `call_mcp`; kiểm tra các lần gọi trong `experiments/kb_tool_calls.jso
 | `OSError: [Errno 98] Address already in use` khi bật webapp | Có tiến trình khác giữ 8765 (hoặc vừa tắt xong còn TIME_WAIT) | Windows: `netstat -ano \| findstr :8765`; WSL: `ss -ltn \| grep 8765`, kill PID rồi thử lại |
 | Scan báo `Completed` nhưng log có `exit=1` | Script cũ thiếu `exit "$RC"` | Đã sửa: cuối `scripts/run_scan.sh` có `exit "$RC"` |
 | `429 / RESOURCE_EXHAUSTED` | Vượt TPM của Gemini 2.5 Flash | Đổi `STRIX_LLM=gemini/gemini-3-flash-preview` trong `experiments/.env` |
-| `kb_calls = 0` ở chế độ `rag` | Chưa cài KB, hoặc agent gọi sai tên tool | Cài mục 5; prompt trong `run_scan.sh` đã dùng đúng `call_mcp` + `connection='owasp_kb'` |
+| `kb_calls = 0` ở chế độ `rag` | Agent không gọi tool đúng cách | KB đã cài (mục 5); prompt trong `run_scan.sh` dùng đúng `call_mcp` + `connection='owasp_kb'`. Thử `python rag/query.py "..." --brief` để chắc index còn nguyên |
 | Không vào được webapp từ Windows | Webapp bind sai host/port | `HOST = 127.0.0.1`, `PORT` lấy từ `STRIX_WEB_PORT` (mặc định 8765); kiểm tra `curl.exe http://127.0.0.1:8765/api/settings` |
 
 ---
