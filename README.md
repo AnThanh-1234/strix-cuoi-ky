@@ -265,3 +265,16 @@ kb/sources, kb/index           dữ liệu nguồn và index (tạo lại đư�
 | Key LLM cho Strix | `experiments/.env` |
 | Token Kaggle | `~/.kaggle/access_token` (trong WSL, quyền 600) |
 | Khóa SSH của máy ảo | `*.pem` — nên chuyển ra `~/.ssh/` |
+## Web UI chạy Strix
+
+Web console chạy cục bộ, không yêu cầu đăng nhập, và bind `127.0.0.1`. Python 3.10+ dùng thư viện chuẩn; có thể chạy trong WSL/Linux hoặc Windows. Khi chạy trên Windows, backend gọi WSL để thực thi Strix; khi chạy trong WSL/Linux, backend gọi `scripts/run_scan.sh` trực tiếp.
+
+```bash
+python3 web/app.py
+```
+
+Mở `http://127.0.0.1:8765`. Cấu hình Strix trong `experiments/.env`; với Juice Shop/DVWA hãy bật lab theo hướng dẫn trước khi scan. Thêm target và xác nhận quyền trước khi tạo lượt quét. Dữ liệu ứng dụng SQLite, log và report được lưu trong `web/data/` (thư mục bị gitignore).
+
+Console gồm quản lý target/scope, scan thủ công, log trong lúc chạy, findings, lịch sử scan, lịch chạy một lần hoặc định kỳ và audit log local operator. Có thể cấu hình webhook HTTPS qua biến môi trường `STRIX_NOTIFY_WEBHOOK` để nhận thông báo khi scan xong/thất bại hoặc có finding Critical/High. Console chỉ dành cho operator trên máy cục bộ; không mở cổng ra mạng nếu chưa thêm đăng nhập/phân quyền.
+
+Report có Risk summary và chi tiết finding theo cách trình bày gần với ZAP, gồm endpoint, CWE, confidence, evidence, impact, remediation và references nếu artifact Strix cung cấp. Dùng **Tải HTML**, **Tải JSON** hoặc **Tải Markdown**. HTML tiện đọc/in, JSON dùng tích hợp tiếp, Markdown phù hợp tài liệu kỹ thuật.

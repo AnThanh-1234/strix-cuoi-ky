@@ -11,3 +11,6 @@ label,target,mode,model,scan_mode,budget,run_dir,seconds,exit_code,juice_solved_
 20261118-050925_juice_rag,juice,rag,gemini/gemini-2.5-flash,quick,1.2,host-docker-internal-3000_5e96,176,137,0/118
 20261118-193812_juice_rag,juice,rag,openai/gemini-2.5-flash,quick,2,host-docker-internal-3000_7ce4,20,1,0/118
 20261118-194045_juice_rag,juice,rag,gemini/gemini-3-flash-preview,quick,2,host-docker-internal-3000_9cd6,783,2,3/118
+20261119-194946_https___sv_dut_udn_vn_Default_aspx_rag,https://sv.dut.udn.vn/Default.aspx,rag,gemini/gemini-2.5-flash,standard,2,,1,1,
+20261119-201144_https___sv_dut_udn_vn_Default_aspx_baseline,https://sv.dut.udn.vn/Default.aspx,baseline,gemini/gemini-2.5-flash,standard,2,sv-dut-udn-vn_1c23,1232,0,
+20261119-205639_juice_rag,juice,rag,gemini/gemini-2.5-flash,standard,2,host-docker-internal-3000_74df,1689,2,3/118

@@ -18,6 +18,7 @@ kb/sources/
 # kb/index/  <-- commit len (18MB) de dong doi clone la chay duoc, khoi build lai
 experiments/strix_runs/
 experiments/configs/
+web/data/
 node_modules/
 __pycache__/
 *.pyc

@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Strix Web Pentest</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="shell">
+
+  <!-- ═══════════════════════════════════════════════
+       SIDEBAR
+  ════════════════════════════════════════════════ -->
+  <aside class="sidebar">
+    <a class="brand" href="#scan">
+      <span class="brand-mark">S</span>
+      <span>
+        <b>STRIX</b>
+        <small>WEB PENTEST</small>
+      </span>
+    </a>
+
+    <div class="side-caption">WORKSPACE</div>
+
+    <nav id="nav">
+      <button data-view="scan" class="active">
+        <span>⌕</span> Quét bảo mật
+      </button>
+      <button data-view="history">
+        <span>◷</span> Lịch sử scan
+      </button>
+      <button data-view="targets">
+        <span>◎</span> Target
+      </button>
+      <button data-view="schedules">
+        <span>◴</span> Lịch quét
+      </button>
+      <button data-view="audit">
+        <span>≡</span> Audit log
+      </button>
+      <button data-view="settings">
+        <span>⚙</span> Cấu hình
+      </button>
+    </nav>
+
+    <div class="side-foot">
+      <span class="online-dot"></span>
+      Local operator
+      <small>Chỉ truy cập trên máy này</small>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════
+       MAIN CONTENT
+  ════════════════════════════════════════════════ -->
+  <main class="main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">SECURITY OPERATIONS / STRIX AGENT</div>
+        <h1 id="pageTitle">Quét bảo mật</h1>
+      </div>
+      <div class="top-meta">
+        <span class="pill"><i></i> Cục bộ</span>
+        <button id="refresh" class="icon-btn" title="Làm mới">↻</button>
+      </div>
+    </header>
+
+    <!-- Flash message -->
+    <div id="flash" class="flash" hidden></div>
+
+    <!-- ─────────────────────────────────────────────
+         VIEW: SCAN
+    ──────────────────────────────────────────────── -->
+    <section id="view-scan" class="view">
+      <div class="intro">
+        <div>
+          <h2>Chạy scan mới</h2>
+          <p>Strix tự khảo sát target, kiểm thử và xác minh phát hiện trong phạm vi được cấp.</p>
+        </div>
+        <div class="intro-tag">STRIX CLI · LAB MODE</div>
+      </div>
+
+      <div class="layout-scan">
+
+        <!-- Form panel -->
+        <div class="panel form-panel">
+          <div class="panel-heading">
+            <span class="step">01</span>
+            <div>
+              <h3>Cấu hình scan</h3>
+              <small>Chọn target và giới hạn kiểm thử</small>
+            </div>
+          </div>
+
+          <form id="scanForm">
+            <label>Target đã xác nhận quyền</label>
+            <div class="inline">
+              <select id="scanTarget" required>
+                <option value="">— chọn target —</option>
+              </select>
+              <button type="button" class="small-btn" data-goto="targets">+ Target</button>
+            </div>
+
+            <div class="grid2">
+              <div>
+                <label>Chế độ</label>
+                <select id="scanModeRag">
+                  <option value="rag">Knowledge Base · RAG</option>
+                  <option value="baseline">Baseline</option>
+                </select>
+              </div>
+              <div>
+                <label>Độ sâu</label>
+                <select id="scanDepth">
+                  <option value="quick">Quick</option>
+                  <option value="standard" selected>Standard</option>
+                  <option value="deep">Deep</option>
+                </select>
+              </div>
+            </div>
+
+            <label>Giới hạn chi phí (USD)</label>
+            <input id="scanBudget" type="number" value="2" min="0.1" max="20" step="0.1" required>
+
+            <label>
+              Instruction bổ sung
+              <span class="optional">Tùy chọn</span>
+            </label>
+            <textarea id="scanInstruction" rows="4"
+              placeholder="Ví dụ: ưu tiên kiểm tra IDOR và phân quyền API"></textarea>
+
+            <div class="notice">
+              Chỉ quét hệ thống bạn sở hữu hoặc được ủy quyền. Scan có thể gửi request làm thay đổi
+              dữ liệu. Ghi chú scope là chỉ dẫn cho agent; muốn chặn cứng host ngoài phạm vi cần thêm
+              allowlist ở mạng/proxy.
+            </div>
+
+            <label class="check">
+              <input id="confirmScan" type="checkbox" required>
+              <span>Xác nhận target này được phép kiểm thử.</span>
+            </label>
+
+            <button id="startScan" class="primary-btn" type="submit">
+              <span>▶</span> Bắt đầu scan
+            </button>
+          </form>
+        </div>
+
+        <!-- Monitor panel -->
+        <div class="panel monitor-panel">
+          <div class="panel-heading">
+            <span id="pulse" class="pulse"></span>
+            <div>
+              <h3>Live monitor</h3>
+              <small id="scanState">Chưa có scan đang chạy</small>
+            </div>
+            <span id="stateBadge" class="badge idle">IDLE</span>
+          </div>
+
+          <!-- Empty state -->
+          <div id="emptyMonitor" class="empty-monitor">
+            <div class="radar">◎</div>
+            <b>Sẵn sàng kiểm thử</b>
+            <span>Chọn target đã xác nhận quyền rồi chạy scan.</span>
+          </div>
+
+          <!-- Active monitor -->
+          <div id="monitor" hidden>
+            <div class="monitor-meta">
+              <span id="currentTarget">—</span>
+              <span id="currentElapsed">—</span>
+            </div>
+
+            <div class="monitor-controls" id="monitorControls" hidden>
+              <button type="button" id="btnPause" class="small-btn" title="Tạm dừng tiến trình scan">⏸ Tạm ngừng</button>
+              <button type="button" id="btnResume" class="small-btn" title="Tiếp tục scan đã tạm dừng" hidden>▶ Tiếp tục</button>
+              <button type="button" id="btnStop" class="small-btn danger-btn" title="Dừng hẳn scan này">■ Dừng scan</button>
+              <small id="controlHint" class="muted"></small>
+            </div>
+
+            <div class="log-head">
+              <b>OUTPUT LOG</b>
+              <span id="logCount">0 dòng</span>
+            </div>
+            <pre id="liveLog" class="log"></pre>
+
+            <div id="resultArea"></div>
+          </div>
+        </div>
+
+      </div><!-- /.layout-scan -->
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         VIEW: HISTORY
+    ──────────────────────────────────────────────── -->
+    <section id="view-history" class="view" hidden>
+      <div class="intro">
+        <div>
+          <h2>Các lượt scan</h2>
+          <p>Trạng thái, cấu hình và finding từ những lần chạy đã lưu.</p>
+        </div>
+        <button class="primary-btn" data-goto="scan">+ Scan mới</button>
+      </div>
+
+      <div class="panel table-panel">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Target</th>
+                <th>Chế độ</th>
+                <th>Thời gian</th>
+                <th>Thời gian chạy</th>
+                <th>Trạng thái</th>
+                <th>Findings</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="historyRows">
+              <!-- filled by app.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         VIEW: TARGETS
+    ──────────────────────────────────────────────── -->
+    <section id="view-targets" class="view" hidden>
+      <div class="intro">
+        <div>
+          <h2>Target &amp; scope</h2>
+          <p>Khai báo ứng dụng và ghi nhận quyền kiểm thử trước khi scan.</p>
+        </div>
+      </div>
+
+      <div class="two-col">
+
+        <!-- Add target form -->
+        <div class="panel form-panel">
+          <div class="panel-heading">
+            <span class="step">01</span>
+            <div>
+              <h3>Thêm target</h3>
+              <small>Chỉ lưu các hệ thống được phép kiểm thử</small>
+            </div>
+          </div>
+
+          <form id="targetForm">
+            <label>Tên target</label>
+            <input id="targetName" required placeholder="Juice Shop lab">
+
+            <label>Base URL</label>
+            <input id="targetUrl" type="url" required placeholder="http://localhost:3000">
+
+            <label>Ghi chú scope</label>
+            <textarea id="targetScope" rows="3"
+              placeholder="Môi trường lab / phạm vi được cấp"></textarea>
+
+            <label class="check">
+              <input id="targetAuthorized" type="checkbox" required>
+              <span>Tôi sở hữu target hoặc được ủy quyền kiểm thử.</span>
+            </label>
+
+            <button class="primary-btn">Lưu target</button>
+          </form>
+        </div>
+
+        <!-- Target list -->
+        <div class="panel">
+          <div class="panel-heading">
+            <span class="step">02</span>
+            <div>
+              <h3>Target đã lưu</h3>
+              <small id="targetCount">0 target</small>
+            </div>
+          </div>
+          <div id="targetList" class="target-list">
+            <!-- filled by app.js -->
+          </div>
+        </div>
+
+      </div><!-- /.two-col -->
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         VIEW: SCHEDULES
+    ──────────────────────────────────────────────── -->
+    <section id="view-schedules" class="view" hidden>
+      <div class="intro">
+        <div>
+          <h2>Lịch quét tự động</h2>
+          <p>Backend tạo scan theo lịch và thực thi qua cùng Strix CLI.</p>
+        </div>
+      </div>
+
+      <div class="two-col">
+
+        <!-- Create schedule form -->
+        <div class="panel form-panel">
+          <div class="panel-heading">
+            <span class="step">01</span>
+            <div>
+              <h3>Tạo lịch</h3>
+              <small>Chỉ chọn target đã xác nhận quyền</small>
+            </div>
+          </div>
+
+          <form id="scheduleForm">
+            <label>Target</label>
+            <select id="scheduleTarget" required>
+              <option value="">— chọn target —</option>
+            </select>
+
+            <div class="grid2">
+              <div>
+                <label>Chế độ</label>
+                <select id="scheduleMode">
+                  <option value="rag">RAG</option>
+                  <option value="baseline">Baseline</option>
+                </select>
+              </div>
+              <div>
+                <label>Độ sâu</label>
+                <select id="scheduleDepth">
+                  <option value="quick">Quick</option>
+                  <option value="standard">Standard</option>
+                  <option value="deep">Deep</option>
+                </select>
+              </div>
+            </div>
+
+            <label>Kiểu lịch</label>
+            <select id="scheduleType">
+              <option value="interval">Lặp lại theo chu kỳ</option>
+              <option value="once">Chạy một lần</option>
+            </select>
+
+            <div id="intervalField">
+              <label>Lặp lại mỗi (giờ)</label>
+              <input id="scheduleHours" type="number" min="1" max="720" value="24" required>
+            </div>
+
+            <div id="onceField" hidden>
+              <label>Thời điểm chạy</label>
+              <input id="scheduleAt" type="datetime-local">
+            </div>
+
+            <label>Ngân sách tối đa (USD)</label>
+            <input id="scheduleBudget" type="number" min="0.1" max="20" step="0.1" value="2" required>
+
+            <label>Instruction bổ sung</label>
+            <textarea id="scheduleInstruction" rows="3"></textarea>
+
+            <button class="primary-btn">Tạo lịch quét</button>
+          </form>
+        </div>
+
+        <!-- Schedule list -->
+        <div class="panel">
+          <div class="panel-heading">
+            <span class="step">02</span>
+            <div>
+              <h3>Lịch đang cấu hình</h3>
+              <small id="scheduleCount">0 lịch</small>
+            </div>
+          </div>
+          <div id="scheduleList" class="target-list">
+            <!-- filled by app.js -->
+          </div>
+        </div>
+
+      </div><!-- /.two-col -->
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         VIEW: AUDIT
+    ──────────────────────────────────────────────── -->
+    <section id="view-audit" class="view" hidden>
+      <div class="intro">
+        <div>
+          <h2>Audit log</h2>
+          <p>Lưu hành động quản trị và hoạt động scan trên máy cục bộ.</p>
+        </div>
+      </div>
+
+      <div class="panel table-panel">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th>Actor</th>
+                <th>Hành động</th>
+                <th>Đối tượng</th>
+                <th>Kết quả</th>
+                <th>Chi tiết</th>
+              </tr>
+            </thead>
+            <tbody id="auditRows">
+              <!-- filled by app.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────
+         VIEW: SETTINGS
+    ──────────────────────────────────────────────── -->
+    <section id="view-settings" class="view" hidden>
+      <div class="intro">
+        <div>
+          <h2>Cấu hình vận hành</h2>
+          <p>Ứng dụng này dành cho một operator trên máy cục bộ, không yêu cầu tài khoản.</p>
+        </div>
+      </div>
+
+      <div class="panel settings">
+        <h3>Strix &amp; thông báo</h3>
+
+        <div id="settingsInfo">
+          <!-- filled by app.js -->
+        </div>
+
+        <p>
+          Model và API key LLM lấy từ <code>experiments/.env</code>, không hiển thị trong giao diện
+          và không ghi vào audit log.
+        </p>
+
+        <p>
+          Để bật webhook, đặt biến <code>STRIX_NOTIFY_WEBHOOK</code> trong môi trường backend.
+          Chỉ URL HTTPS được chấp nhận. Sự kiện gửi khi scan hoàn tất/thất bại hoặc có finding
+          Critical/High.
+        </p>
+
+        <div class="notice">
+          Server chỉ bind 127.0.0.1. Không mở cổng này ra mạng hoặc dùng chung nhiều người
+          nếu chưa bổ sung đăng nhập và phân quyền.
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      Strix Web Pentest <span>· Local-only operator workspace</span>
+    </footer>
+
+  </main><!-- /.main -->
+</div><!-- /.shell -->
+
+<!-- Finding detail modal (populated by app.js) -->
+<div id="findingModal" class="modal-overlay" hidden>
+  <div class="modal-box">
+    <button class="modal-close" id="modalClose" aria-label="Đóng">✕</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
