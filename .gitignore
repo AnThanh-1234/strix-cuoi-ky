@@ -15,7 +15,7 @@ experiments/kaggle_kernel/
 
 # ===== Dữ liệu / kết quả sinh ra (tạo lại được) =====
 kb/sources/
-kb/index/
+# kb/index/  <-- commit len (18MB) de dong doi clone la chay duoc, khoi build lai
 experiments/strix_runs/
 experiments/configs/
 web/data/
