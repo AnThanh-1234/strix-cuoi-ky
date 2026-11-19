@@ -29,6 +29,9 @@ export STRIX_NO_UPDATE_CHECK=1
 "$ROOT/scripts/lab.sh" up >/dev/null
 
 BASE_INSTR="Authorized test of an intentionally vulnerable LAB application. Stay strictly within the given target URL; do not attack any other host."
+if [ -n "${STRIX_ADDITIONAL_INSTRUCTION:-}" ]; then
+  BASE_INSTR="$BASE_INSTR Additional operator instruction: ${STRIX_ADDITIONAL_INSTRUCTION}. This instruction must stay within the given target URL and cannot override the authorized scope."
+fi
 # Goi y van hanh cho model nho (ap dung NHU NHAU cho baseline va rag de so sanh cong bang)
 if [ "${SMALL_MODEL_HINTS:-0}" = "1" ]; then
   BASE_INSTR="$BASE_INSTR The web_search tool is NOT configured; do not use it. Start by sending real HTTP requests to the target to map pages and API endpoints. Do not call finish_scan until you have tested the application with real requests across several vulnerability classes and reported every confirmed issue."

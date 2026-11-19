@@ -18,6 +18,7 @@ kb/sources/
 kb/index/
 experiments/strix_runs/
 experiments/configs/
+web/data/
 node_modules/
 __pycache__/
 *.pyc
