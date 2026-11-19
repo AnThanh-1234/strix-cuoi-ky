@@ -442,6 +442,14 @@ button, input, select, textarea {
 .badge.paused   { background: rgba(245,158,11,0.20); color: var(--amber); border: 1px solid rgba(245,158,11,0.4); }
 .badge.stopped  { background: rgba(239,68,68,0.15); color: var(--red); }
 
+/* Severity breakdown trong bang History (C/H/M/L/I) - chi ap dung o day
+   de khong doi mau badge Authorized/Disabled tren card target. */
+#historyRows .badge.critical { background: rgba(220,38,127,0.18); color: #f472b6; border: 1px solid rgba(220,38,127,0.35); }
+#historyRows .badge.high     { background: rgba(239,68,68,0.15);  color: var(--red);   border: 1px solid rgba(239,68,68,0.3); }
+#historyRows .badge.medium   { background: rgba(245,158,11,0.15); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+#historyRows .badge.low      { background: rgba(59,130,246,0.15); color: var(--blue);  border: 1px solid rgba(59,130,246,0.3); }
+#historyRows .badge.info     { background: rgba(148,163,184,0.1); color: var(--muted); border: 1px solid var(--border); }
+
 /* ── Status text ────────────────────────────────────────────── */
 .status-text            { font-size: 12px; font-weight: 600; }
 .status-text.completed  { color: var(--green); }
