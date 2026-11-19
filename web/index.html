@@ -174,6 +174,13 @@
               <span id="currentElapsed">—</span>
             </div>
 
+            <div class="monitor-controls" id="monitorControls" hidden>
+              <button type="button" id="btnPause" class="small-btn" title="Tạm dừng tiến trình scan">⏸ Tạm ngừng</button>
+              <button type="button" id="btnResume" class="small-btn" title="Tiếp tục scan đã tạm dừng" hidden>▶ Tiếp tục</button>
+              <button type="button" id="btnStop" class="small-btn danger-btn" title="Dừng hẳn scan này">■ Dừng scan</button>
+              <small id="controlHint" class="muted"></small>
+            </div>
+
             <div class="log-head">
               <b>OUTPUT LOG</b>
               <span id="logCount">0 dòng</span>

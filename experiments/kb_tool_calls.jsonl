@@ -18,3 +18,7 @@
 {"ts": "2026-11-19T20:58:48", "run": "20261119-205639_juice_rag", "tool": "search_security_kb", "args": {"query": "IDOR how to test", "source": "wstg", "vuln_type": null}, "n_results": 5, "ms": 38}
 {"ts": "2026-11-19T20:58:48", "run": "20261119-205639_juice_rag", "tool": "search_security_kb", "args": {"query": "SQL injection login", "source": "wstg", "vuln_type": null}, "n_results": 5, "ms": 36}
 {"ts": "2026-11-19T20:59:26", "run": "20261119-205639_juice_rag", "tool": "search_security_kb", "args": {"query": "XSS testing", "source": "wstg", "vuln_type": null}, "n_results": 5, "ms": 82}
+{"ts": "2026-11-19T21:02:30", "run": "20261119-205639_juice_rag", "tool": "search_security_kb", "args": {"query": "Broken Function Level Authorization", "source": "wstg", "vuln_type": null}, "n_results": 5, "ms": 37}
+{"ts": "2026-11-19T21:18:59", "run": "20261119-205639_juice_rag", "tool": "search_security_kb", "args": {"query": "OWASP Juice Shop admin login", "source": "wstg", "vuln_type": null}, "n_results": 5, "ms": 94}
+{"ts": "2026-11-19T21:22:47", "run": "20261119-205639_juice_rag", "tool": "search_security_kb", "args": {"query": "OWASP Juice Shop default admin password", "source": "wstg", "vuln_type": null}, "n_results": 5, "ms": 50}
+{"ts": "2026-11-19T21:31:03", "run": "20261119-213035_http___aspnet_testsparker_com__rag", "tool": "search_security_kb", "args": {"query": "reconnaissance", "source": "wstg", "vuln_type": null}, "n_results": 5, "ms": 547}

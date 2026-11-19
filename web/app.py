@@ -9,6 +9,7 @@ import queue
 import re
 import secrets
 import shlex
+import signal
 import sqlite3
 import subprocess
 import threading
@@ -30,6 +31,14 @@ HOST = "127.0.0.1"
 LOG_LIMIT = 300_000
 JOB_QUEUE: queue.Queue[int] = queue.Queue()
 SCAN_SUBMIT_LOCK = threading.Lock()
+# Luu process cua runner (bash -> strix -> tee) de dieu khien bang tin hieu.
+# start_new_session=True khi Popen de moi scan la mot process group rieng.
+SCAN_PROCESSES: dict[int, subprocess.Popen] = {}
+SCAN_PROC_LOCK = threading.Lock()
+ACTIVE_STATUSES = ("Queued", "Running", "Paused")
+SIG_STOP = getattr(signal, "SIGSTOP", signal.SIGTERM)
+SIG_CONT = getattr(signal, "SIGCONT", None)
+SIG_KILL = getattr(signal, "SIGKILL", None)
 
 
 class ScanBusyError(Exception):
@@ -61,7 +70,8 @@ def init_db() -> None:
           target_url TEXT NOT NULL, mode TEXT NOT NULL, scan_mode TEXT NOT NULL,
           budget REAL NOT NULL, instruction TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT 'manual',
           schedule_id INTEGER, status TEXT NOT NULL, created_at REAL NOT NULL,
-          started_at REAL, ended_at REAL, exit_code INTEGER, error TEXT NOT NULL DEFAULT '',
+          started_at REAL, ended_at REAL, paused_at REAL,
+          paused_total REAL NOT NULL DEFAULT 0, exit_code INTEGER, error TEXT NOT NULL DEFAULT '',
           run_dir TEXT NOT NULL DEFAULT '', log_path TEXT NOT NULL DEFAULT '',
           logs TEXT NOT NULL DEFAULT '', findings_json TEXT NOT NULL DEFAULT '[]',
           FOREIGN KEY(target_id) REFERENCES targets(id));
@@ -84,10 +94,15 @@ def init_db() -> None:
         schedule_columns = {row[1] for row in conn.execute("PRAGMA table_info(schedules)")}
         if "schedule_type" not in schedule_columns:
             conn.execute("ALTER TABLE schedules ADD COLUMN schedule_type TEXT NOT NULL DEFAULT 'interval'")
+        scan_columns = {row[1] for row in conn.execute("PRAGMA table_info(scans)")}
+        if "paused_at" not in scan_columns:
+            conn.execute("ALTER TABLE scans ADD COLUMN paused_at REAL")
+        if "paused_total" not in scan_columns:
+            conn.execute("ALTER TABLE scans ADD COLUMN paused_total REAL NOT NULL DEFAULT 0")
         # A web server restart cannot safely resume a CLI process from the old process tree.
         now = time.time()
-        interrupted = conn.execute("SELECT id FROM scans WHERE status IN ('Running','Queued')").fetchall()
-        conn.execute("UPDATE scans SET status='Failed', ended_at=?, error='Backend restarted while scan was active.' WHERE status IN ('Running','Queued')", (now,))
+        interrupted = conn.execute("SELECT id FROM scans WHERE status IN ('Running','Queued','Paused')").fetchall()
+        conn.execute("UPDATE scans SET status='Failed', ended_at=?, paused_at=NULL, error='Backend restarted while scan was active.' WHERE status IN ('Running','Queued','Paused')", (now,))
         for row in interrupted:
             conn.execute("INSERT INTO audit(created_at,actor,action,object_type,object_id,result,details) VALUES(?,?,?,?,?,?,?)",
                          (now, "local operator", "scan.failed", "scan", str(row["id"]), "interrupted", "Backend restarted while scan was active."))
@@ -175,7 +190,12 @@ def scan_json(row: sqlite3.Row, include_detail: bool = False) -> dict:
     findings = finding_list(item.pop("findings_json", "[]"))
     item["finding_count"] = len(findings)
     item["actor"] = "local operator"
-    item["duration_seconds"] = int((item.get("ended_at") or time.time()) - item["started_at"]) if item.get("started_at") else None
+    if item.get("started_at"):
+        # Khi dang Paused, dung paused_at lam moc ket thuc de dong ho khong chay tiep.
+        end_at = item.get("ended_at") or item.get("paused_at") or time.time()
+        item["duration_seconds"] = max(0, int(end_at - item["started_at"] - (item.get("paused_total") or 0)))
+    else:
+        item["duration_seconds"] = None
     if include_detail:
         item["findings"] = findings
     item.pop("logs", None)
@@ -196,7 +216,7 @@ def create_scan(target: sqlite3.Row, mode: str, depth: str, budget: float, instr
     log_path = str(LOG_DIR / f"scan-{secrets.token_hex(6)}.log")
     with SCAN_SUBMIT_LOCK:
         with connect() as conn:
-            busy = conn.execute("SELECT COUNT(*) FROM scans WHERE status IN ('Queued','Running')").fetchone()[0]
+            busy = conn.execute("SELECT COUNT(*) FROM scans WHERE status IN ('Queued','Running','Paused')").fetchone()[0]
             if busy:
                 raise ScanBusyError("Một lượt scan khác đang chạy hoặc chờ xử lý.")
             cursor = conn.execute("""INSERT INTO scans(target_id,target_name,target_url,mode,scan_mode,budget,instruction,
@@ -334,9 +354,26 @@ def simulate_scan_stream(scan_id: int, row: sqlite3.Row, log_path: Path) -> tupl
     ]
 
     logs = ""
+
+    def wait_ready() -> bool:
+        # Che do demo khong co process de signal -> doc trang thai tu DB.
+        while True:
+            with connect() as conn:
+                st = conn.execute("SELECT status FROM scans WHERE id=?", (scan_id,)).fetchone()
+            if not st or st["status"] == "Stopped":
+                return False
+            if st["status"] != "Paused":
+                return True
+            time.sleep(0.3)
+
     with log_path.open("w", encoding="utf-8", errors="replace") as logfile:
         for delay, chunk in steps:
+            if not wait_ready():
+                return 0, "", []
             time.sleep(delay)
+            # Pause co den trong luc sleep -> kiem tra lai truoc khi ghi log.
+            if not wait_ready():
+                return 0, "", []
             logfile.write(chunk)
             logfile.flush()
             logs = (logs + chunk)[-LOG_LIMIT:]
@@ -353,10 +390,94 @@ def simulate_scan_stream(scan_id: int, row: sqlite3.Row, log_path: Path) -> tupl
     return 0, "", findings
 
 
-def execute_scan(scan_id: int) -> None:
+def _signal_process_group(scan_id: int, sig: int) -> bool:
+    """Gui tin hieu toan bo process group cua runner (bash -> strix -> tee)."""
+    with SCAN_PROC_LOCK:
+        proc = SCAN_PROCESSES.get(scan_id)
+    if not proc or proc.poll() is not None:
+        return False
+    try:
+        if os.name == "posix":
+            os.killpg(os.getpgid(proc.pid), sig)
+        elif sig == signal.SIGTERM:
+            proc.terminate()
+        else:
+            return False
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def scan_control_row(scan_id: int) -> sqlite3.Row:
     with connect() as conn:
         row = conn.execute("SELECT * FROM scans WHERE id=?", (scan_id,)).fetchone()
     if not row:
+        raise ValueError("Không tìm thấy scan.")
+    return row
+
+
+def pause_scan(scan_id: int) -> dict:
+    row = scan_control_row(scan_id)
+    if row["status"] != "Running":
+        raise ValueError(f"Chỉ tạm ngừng được scan đang chạy (hiện tại: {row['status']}).")
+    now = time.time()
+    with connect() as conn:
+        conn.execute("UPDATE scans SET status='Paused',paused_at=? WHERE id=? AND status='Running'", (now, scan_id))
+    # SIGSTOP khong the bi bat -> duong nhien dung toan bo agent trong sandbox.
+    _signal_process_group(scan_id, SIG_STOP)
+    audit("scan.paused", "scan", scan_id)
+    return scan_json(scan_control_row(scan_id), include_detail=True)
+
+
+def resume_scan(scan_id: int) -> dict:
+    row = scan_control_row(scan_id)
+    if row["status"] != "Paused":
+        raise ValueError(f"Chỉ tiếp tục được scan đang tạm ngừng (hiện tại: {row['status']}).")
+    now = time.time()
+    paused_for = max(0.0, now - (row["paused_at"] or now))
+    with connect() as conn:
+        conn.execute("UPDATE scans SET status='Running',paused_at=NULL,paused_total=paused_total+? WHERE id=? AND status='Paused'",
+                     (paused_for, scan_id))
+    if SIG_CONT is not None:
+        _signal_process_group(scan_id, SIG_CONT)
+    audit("scan.resumed", "scan", scan_id, details=f"paused_for={int(paused_for)}s")
+    return scan_json(scan_control_row(scan_id), include_detail=True)
+
+
+def stop_scan(scan_id: int) -> dict:
+    row = scan_control_row(scan_id)
+    if row["status"] not in ACTIVE_STATUSES:
+        raise ValueError(f"Không thể dừng scan ở trạng thái {row['status']}.")
+    now = time.time()
+    with connect() as conn:
+        conn.execute("UPDATE scans SET status='Stopped',ended_at=?,paused_at=NULL,error=?,"
+                     "logs=logs || ? WHERE id=?",
+                     (now, "Scan stopped by operator.", "\n[*] Scan stopped by operator.\n", scan_id))
+    if row["status"] == "Paused" and SIG_CONT is not None:
+        # Process dang bi SIGSTOP: SIGCONT de handler SIGTERM cua Strix chay duoc.
+        _signal_process_group(scan_id, SIG_CONT)
+    _signal_process_group(scan_id, signal.SIGTERM)
+    with SCAN_PROC_LOCK:
+        proc = SCAN_PROCESSES.get(scan_id)
+    if proc:
+        try:
+            proc.wait(timeout=4)
+        except subprocess.TimeoutExpired:
+            if SIG_KILL is not None:
+                _signal_process_group(scan_id, SIG_KILL)
+            else:
+                proc.kill()
+    audit("scan.stopped", "scan", scan_id, details=f"previous_status={row['status']}")
+    stopped = scan_json(scan_control_row(scan_id), include_detail=True)
+    notify(stopped)
+    return stopped
+
+
+def execute_scan(scan_id: int) -> None:
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM scans WHERE id=?", (scan_id,)).fetchone()
+    if not row or row["status"] != "Queued":
+        # Stop duoc goi truoc khi worker kip lay scan tu hang doi.
         return
     current_target = target_row(row["target_id"])
     if not current_target or not current_target["active"] or not current_target["authorized"]:
@@ -370,7 +491,10 @@ def execute_scan(scan_id: int) -> None:
         return
     started = time.time()
     with connect() as conn:
-        conn.execute("UPDATE scans SET status='Running',started_at=? WHERE id=?", (started, scan_id))
+        claimed = conn.execute("UPDATE scans SET status='Running',started_at=? WHERE id=? AND status='Queued'",
+                               (started, scan_id))
+    if not claimed.rowcount:
+        return
     audit("scan.started", "scan", scan_id)
     run_dir_before = {p.name for p in (ROOT / "experiments" / "strix_runs").glob("*") if p.is_dir()} if (ROOT / "experiments" / "strix_runs").exists() else set()
     log_path = Path(row["log_path"])
@@ -379,6 +503,7 @@ def execute_scan(scan_id: int) -> None:
     error = ""
     run_dir = ""
     findings: list = []
+    process: subprocess.Popen | None = None
     try:
         if is_demo_mode():
             exit_code, error, findings = simulate_scan_stream(scan_id, row, log_path)
@@ -394,7 +519,9 @@ def execute_scan(scan_id: int) -> None:
             with log_path.open("w", encoding="utf-8", errors="replace") as logfile:
                 process = subprocess.Popen(command, cwd=cwd, env=env, stdout=subprocess.PIPE,
                                            stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
-                                           bufsize=1)
+                                           bufsize=1, start_new_session=True)
+                with SCAN_PROC_LOCK:
+                    SCAN_PROCESSES[scan_id] = process
                 pending: list[str] = []
                 last_flush = time.monotonic()
                 assert process.stdout is not None
@@ -412,8 +539,6 @@ def execute_scan(scan_id: int) -> None:
                 exit_code = process.wait()
                 with connect() as conn:
                     conn.execute("UPDATE scans SET logs=? WHERE id=?", (logs, scan_id))
-            if exit_code:
-                error = f"Strix runner exited with code {exit_code}."
             runs_dir = ROOT / "experiments" / "strix_runs"
             if runs_dir.exists():
                 created = [p for p in runs_dir.iterdir() if p.is_dir() and p.name not in run_dir_before]
@@ -424,20 +549,42 @@ def execute_scan(scan_id: int) -> None:
                     if result_path.exists():
                         data = json.loads(result_path.read_text(encoding="utf-8"))
                         findings = data if isinstance(data, list) else []
-            final_status = "Completed" if exit_code == 0 else "Failed"
+            # Strix o che do headless tra exit 2 khi co finding >= --fail-on
+            # (mac dinh: bat ky finding nao). Day la tin hieu CI, khong phai loi.
+            completed_banner = "Penetration test completed" in logs
+            fail_on_gate = exit_code == 2 and (bool(findings) or completed_banner)
+            if exit_code and not fail_on_gate:
+                error = f"Strix runner exited with code {exit_code}."
+            final_status = "Completed" if (exit_code == 0 or fail_on_gate) else "Failed"
     except Exception as exc:
         final_status = "Failed"
         error = scrub_log(str(exc))[:1500]
         logs = (logs + f"\n[web backend] {error}\n")[-LOG_LIMIT:]
         with connect() as conn:
             conn.execute("UPDATE scans SET logs=? WHERE id=?", (logs, scan_id))
+    finally:
+        with SCAN_PROC_LOCK:
+            SCAN_PROCESSES.pop(scan_id, None)
     ended = time.time()
     with connect() as conn:
-        conn.execute("UPDATE scans SET status=?,ended_at=?,exit_code=?,error=?,run_dir=?,findings_json=?,logs=? WHERE id=?",
-                     (final_status, ended, exit_code, error, run_dir, json.dumps(findings, ensure_ascii=False), logs, scan_id))
+        current = conn.execute("SELECT status FROM scans WHERE id=?", (scan_id,)).fetchone()
+    stopped = bool(current and current["status"] == "Stopped")
+    if stopped:
+        # API da dat Stopped truoc khi kill process -> khong ghi de thanh Failed.
+        final_status = "Stopped"
+        error = "Scan stopped by operator."
+        logs = (logs + "\n[*] Scan stopped by operator.\n")[-LOG_LIMIT:]
+    with connect() as conn:
+        if stopped:
+            conn.execute("UPDATE scans SET ended_at=?,exit_code=?,error=?,run_dir=?,findings_json=?,logs=? WHERE id=?",
+                         (ended, exit_code, error, run_dir, json.dumps(findings, ensure_ascii=False), logs, scan_id))
+        else:
+            conn.execute("UPDATE scans SET status=?,ended_at=?,exit_code=?,error=?,run_dir=?,findings_json=?,logs=? WHERE id=?",
+                         (final_status, ended, exit_code, error, run_dir, json.dumps(findings, ensure_ascii=False), logs, scan_id))
         saved = conn.execute("SELECT * FROM scans WHERE id=?", (scan_id,)).fetchone()
-    audit("scan.completed" if final_status == "Completed" else "scan.failed", "scan", scan_id,
-          result=final_status.lower(), details=f"exit={exit_code}; findings={len(findings)}; duration={int(ended-started)}s")
+    audit("scan.completed" if final_status == "Completed" else ("scan.stopped" if stopped else "scan.failed"),
+          "scan", scan_id, result=final_status.lower(),
+          details=f"exit={exit_code}; findings={len(findings)}; duration={int(ended-started)}s")
     notify({**scan_json(saved, include_detail=True)})
 
 
@@ -457,7 +604,7 @@ def scheduler() -> None:
             due = conn.execute("""SELECT s.*,t.name AS target_name,t.base_url,t.scope_note,t.active AS target_active,t.authorized
               FROM schedules s JOIN targets t ON t.id=s.target_id
               WHERE s.active=1 AND s.next_run_at<=? ORDER BY s.next_run_at LIMIT 10""", (now,)).fetchall()
-            busy = conn.execute("SELECT COUNT(*) FROM scans WHERE status IN ('Queued','Running')").fetchone()[0] > 0
+            busy = conn.execute("SELECT COUNT(*) FROM scans WHERE status IN ('Queued','Running','Paused')").fetchone()[0] > 0
         for item in due:
             if not item["target_active"] or not item["authorized"]:
                 with connect() as conn:
@@ -595,7 +742,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send((WEB / path.lstrip("/")).read_bytes(), content_type="text/javascript; charset=utf-8" if path.endswith(".js") else "text/css; charset=utf-8")
         elif path == "/api/settings":
             with connect() as conn:
-                active = conn.execute("SELECT COUNT(*) FROM scans WHERE status IN ('Queued','Running')").fetchone()[0]
+                active = conn.execute("SELECT COUNT(*) FROM scans WHERE status IN ('Queued','Running','Paused')").fetchone()[0]
             has_env = (ROOT / "experiments" / ".env").exists()
             self.send_json({
                 "strix_configured": True,
@@ -612,7 +759,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/scans":
             active_only = query.get("active", [""])[0] == "1"
             with connect() as conn:
-                rows = conn.execute("SELECT * FROM scans WHERE status IN ('Queued','Running') ORDER BY created_at" if active_only else "SELECT * FROM scans ORDER BY created_at DESC LIMIT 300").fetchall()
+                rows = conn.execute("SELECT * FROM scans WHERE status IN ('Queued','Running','Paused') ORDER BY created_at" if active_only else "SELECT * FROM scans ORDER BY created_at DESC LIMIT 300").fetchall()
             self.send_json([scan_json(row) for row in rows])
         elif re.fullmatch(r"/api/scans/\d+", path):
             scan_id = int(path.rsplit("/", 1)[1])
@@ -692,6 +839,11 @@ class Handler(BaseHTTPRequestHandler):
                 with connect() as conn:
                     row = conn.execute("SELECT * FROM scans WHERE id=?", (scan_id,)).fetchone()
                 self.send_json(scan_json(row), 202)
+            elif re.fullmatch(r"/api/scans/\d+/(pause|resume|stop)", path):
+                parts = path.split("/")
+                scan_id, action = int(parts[3]), parts[4]
+                controllers = {"pause": pause_scan, "resume": resume_scan, "stop": stop_scan}
+                self.send_json(controllers[action](scan_id))
             elif path == "/api/schedules":
                 target_id = int(data.get("target_id"))
                 target = target_row(target_id)

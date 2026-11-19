@@ -439,6 +439,8 @@ button, input, select, textarea {
 .badge.completed { background: rgba(16,185,129,0.15); color: var(--green); }
 .badge.failed   { background: rgba(239,68,68,0.15);  color: var(--red); }
 .badge.queued   { background: rgba(59,130,246,0.15); color: var(--blue); }
+.badge.paused   { background: rgba(245,158,11,0.20); color: var(--amber); border: 1px solid rgba(245,158,11,0.4); }
+.badge.stopped  { background: rgba(239,68,68,0.15); color: var(--red); }
 
 /* ── Status text ────────────────────────────────────────────── */
 .status-text            { font-size: 12px; font-weight: 600; }
@@ -710,6 +712,27 @@ button, input, select, textarea {
 }
 
 .monitor-meta strong { color: var(--text); font-weight: 600; }
+
+/* ── Monitor controls (pause / resume / stop) ───────────────── */
+.monitor-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.monitor-controls .small-btn {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+.monitor-controls .small-btn[hidden] { display: none; }
+.monitor-controls .small-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.monitor-controls .muted { font-size: 11.5px; }
+.monitor-controls .small-btn.danger-btn {
+  color: var(--red);
+  background: rgba(239,68,68,0.12);
+  border-color: rgba(239,68,68,0.35);
+}
+.monitor-controls .small-btn.danger-btn:hover { background: rgba(239,68,68,0.22); }
 
 /* ── Log area ───────────────────────────────────────────────── */
 .log-head {

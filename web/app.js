@@ -396,10 +396,12 @@ function buildHistoryRow(scan) {
 
 function statusToClass(status) {
   switch (status) {
-    case 'Completed': return 'info';
-    case 'Running':   return 'medium';
-    case 'Queued':    return 'low';
-    case 'Failed':    return 'high';
+    case 'Completed': return 'completed';
+    case 'Running':   return 'running';
+    case 'Queued':    return 'queued';
+    case 'Paused':    return 'paused';
+    case 'Stopped':   return 'stopped';
+    case 'Failed':    return 'failed';
     default:          return 'muted';
   }
 }
@@ -649,6 +651,24 @@ async function showScan(scanId, live = false) {
     const isLive = scan.status === 'Running' || scan.status === 'Queued';
     if (pulseEl) pulseEl.classList.toggle('active', isLive);
 
+    // Pause / resume / stop controls
+    const isPaused = scan.status === 'Paused';
+    const isStoppable = isLive || isPaused;
+    const controls = $('#monitorControls');
+    if (controls) controls.hidden = !isStoppable;
+    const btnPause = $('#btnPause');
+    const btnResume = $('#btnResume');
+    const btnStop = $('#btnStop');
+    if (btnPause) btnPause.hidden = scan.status !== 'Running';
+    if (btnResume) btnResume.hidden = !isPaused;
+    if (btnStop) btnStop.hidden = !isStoppable;
+    const controlHint = $('#controlHint');
+    if (controlHint) {
+      controlHint.textContent = isPaused
+        ? 'Đang tạm ngừng — log và đồng hồ được giữ nguyên.'
+        : (scan.status === 'Queued' ? 'Scan đang chờ trong hàng đợi.' : '');
+    }
+
     // Live log
     const liveLog = $('#liveLog');
     if (liveLog) {
@@ -682,8 +702,23 @@ async function showScan(scanId, live = false) {
         notice.appendChild(msg);
         resultArea.appendChild(notice);
       }
+    } else if (scan.status === 'Stopped') {
+      if (resultArea) {
+        resultArea.innerHTML = '';
+        const notice = document.createElement('div');
+        notice.className = 'error-notice';
+        const icon = document.createElement('p');
+        icon.textContent = '⏹ Scan đã dừng';
+        icon.className = 'error-title';
+        const msg = document.createElement('p');
+        msg.className = 'muted';
+        msg.textContent = scan.error || 'Người dùng đã dừng lượt quét này.';
+        notice.appendChild(icon);
+        notice.appendChild(msg);
+        resultArea.appendChild(notice);
+      }
     } else {
-      // Running or Queued — clear results
+      // Running, Queued hoặc Paused — clear results
       if (resultArea) resultArea.innerHTML = '';
     }
 
@@ -993,6 +1028,40 @@ async function downloadReport(scanId, format) {
 // =============================================================================
 
 function setupEventListeners() {
+
+  // --- Scan controls: pause / resume / stop ---
+  const bindScanControl = (selector, action, successMsg) => {
+    const el = $(selector);
+    if (!el) return;
+    el.addEventListener('click', async () => {
+      const scan = state.activeScan;
+      if (!scan) { flash('Chưa có scan nào được chọn.', true); return; }
+      if (action === 'stop' &&
+          !window.confirm(`Dừng scan #${scan.id}? Tiến trình sẽ bị kết thúc, không thể tiếp tục.`)) return;
+      const original = el.textContent;
+      el.disabled = true;
+      el.textContent = 'Đang xử lý…';
+      try {
+        const updated = await api(`/api/scans/${scan.id}/${action}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        });
+        state.activeScan = updated;
+        flash(successMsg);
+        await showScan(scan.id, true);
+        pollActive();
+      } catch (err) {
+        flash(`Lỗi ${action}: ${err.message}`, true);
+      } finally {
+        el.disabled = false;
+        el.textContent = original;
+      }
+    });
+  };
+  bindScanControl('#btnPause', 'pause', 'Đã tạm ngừng scan.');
+  bindScanControl('#btnResume', 'resume', 'Đã tiếp tục scan.');
+  bindScanControl('#btnStop', 'stop', 'Đã dừng scan.');
 
   // --- Nav click ---
   const nav = $('#nav');

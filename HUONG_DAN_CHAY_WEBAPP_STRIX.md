@@ -237,6 +237,49 @@ run của Strix ở `experiments/strix_runs/<label>/`.
 
 > ⚠️ Chỉ quét target bạn có quyền kiểm thử chính thức. `sv.dut.udn.vn` là site thật.
 
+### 3.1. Tạm ngừng / tiếp tục / dừng scan
+
+Trên panel **Live monitor**, khi scan đang `Running`/`Queued` sẽ hiện 3 nút:
+**⏸ Tạm ngừng**, **▶ Tiếp tục** (chỉ hiện khi `Paused`) và **■ Dừng scan**.
+
+API tương ứng (chỉ localhost):
+
+```bash
+curl -X POST http://127.0.0.1:8765/api/scans/<id>/pause
+curl -X POST http://127.0.0.1:8765/api/scans/<id>/resume
+curl -X POST http://127.0.0.1:8765/api/scans/<id>/stop
+```
+
+Cơ chế:
+
+- `web/app.py` giữ runner trong `SCAN_PROCESSES` và khởi tạo nó bằng `start_new_session=True`
+  → mỗi scan là một **process group** riêng (`bash` → `strix` → `tee`).
+- **Pause**: gửi `SIGSTOP` tới cả group → toàn bộ agent trong sandbox bị đóng băng,
+  không gọi Gemini thêm, log và đồng hồ dừng (DB lưu `paused_at`).
+- **Resume**: gửi `SIGCONT` và cộng thời gian đã tạm dừng vào `paused_total`
+  → `duration_seconds` không tính khoảng nghỉ.
+- **Stop**: đặt status `Stopped`, gửi `SIGCONT` (nếu đang pause) rồi `SIGTERM` tới group.
+  Strix có handler `SIGTERM` nên tự dọn sandbox container; sau 4s chưa thoát thì `SIGKILL`.
+  Worker không ghi đè status `Stopped` thành `Failed`.
+- Các trạng thái mới: `Paused`, `Stopped`. Cả hai đều tính là "active" để webapp tiếp tục
+  poll và chặn không cho chạy scan khác cùng lúc.
+- Restart backend trong lúc scan `Running`/`Queued`/`Paused` vẫn đánh dấu `Failed` như cũ
+  (không thể khôi phục process tree cũ).
+
+> Lưu ý: nếu tạm ngừng quá lâu, request Gemini đang mở có thể hết hạn khi tiếp tục →
+  scan chuyển `Failed`. Nên resume sau vài phút. Chế độ demo (không có `experiments/.env`)
+  cũng hỗ trợ pause/resume/stop thông qua kiểm tra trạng thái trong DB.
+
+**Muốn dùng nút này thì phải restart webapp** sau khi sửa `web/app.py`:
+
+```bash
+pkill -f 'python3 .*web/app.py'   # hoặc: đóng terminal cũ rồi chạy lại lệnh ở Bước 2
+cd "/mnt/d/Thanh/TLHT/HK 9/ATTT/strix-cuoi-ky"
+python3 web/app.py
+```
+
+Không restart lúc scan đang chạy nếu không muốn lượt đó bị đánh dấu `Failed`.
+
 ---
 
 ## 4. Chạy Strix trực tiếp (không qua webapp)
@@ -309,6 +352,7 @@ gọi trong `experiments/kb_tool_calls.jsonl` (`kb_calls` trong bảng kết qu�
 | `/bin/sh: bash: not found` (exit 127) | Lệnh chạy nhầm distro `docker-desktop` | `wsl -s Ubuntu`; webapp phải chạy **trong Ubuntu**, không gọi `wsl.exe` từ Windows |
 | `OSError: [Errno 98] Address already in use` khi bật webapp | Có tiến trình khác giữ 8765 (hoặc vừa tắt xong còn TIME_WAIT) | Windows: `netstat -ano \| findstr :8765`; WSL: `ss -ltn \| grep 8765`, kill PID rồi thử lại |
 | Scan báo `Completed` nhưng log có `exit=1` | Script cũ thiếu `exit "$RC"` | Đã sửa: cuối `scripts/run_scan.sh` có `exit "$RC"` |
+| Scan có finding nhưng webapp báo `Failed`, log `exit=2` | Strix headless dùng `--fail-on` (mặc định: **bất kỳ finding nào cũng exit 2** để chặn CI). Đây không phải lỗi — báo cáo vẫn được ghi đầy đủ | Đã sửa `web/app.py`: `exit=2` + có findings (hoặc banner `Penetration test completed`) → `Completed`. Các lỗi thật (`exit=1`, SIGTERM…) vẫn là `Failed` |
 | `429 / RESOURCE_EXHAUSTED` | Vượt TPM của Gemini 2.5 Flash | Đổi `STRIX_LLM=gemini/gemini-3-flash-preview` trong `experiments/.env` |
 | `kb_calls = 0` ở chế độ `rag` | Agent không gọi tool đúng cách | KB đã cài (mục 5); prompt trong `run_scan.sh` dùng đúng `call_mcp` + `connection='owasp_kb'`. Thử `python rag/query.py "..." --brief` để chắc index còn nguyên |
 | Không vào được webapp từ Windows | Webapp bind sai host/port | `HOST = 127.0.0.1`, `PORT` lấy từ `STRIX_WEB_PORT` (mặc định 8765); kiểm tra `curl.exe http://127.0.0.1:8765/api/settings` |
