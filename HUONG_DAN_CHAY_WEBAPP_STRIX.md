@@ -191,9 +191,19 @@ Log ban đầu:
 
 ```
 Strix Web Pentest: http://127.0.0.1:8765
-Database: .../web/data/strix_web.sqlite3
+Database: /home/<user>/.strix-web-data/strix_web.sqlite3
 Local-only mode; no login is configured.
 ```
+
+> **Dữ liệu nằm ngoài repo.** Mặc định webapp dùng `~/.strix-web-data` (trong home WSL),
+> không phải `web/data/`. Nhờ vậy đổi nhánh, `git stash -a` hay `git clean -fdx` không
+> bao giờ xoá được target/lịch sử scan. Nếu muốn đổi chỗ khác:
+>
+> ```bash
+> export STRIX_WEB_DATA=/duong/dan/khac
+> ```
+>
+> Lần đầu chạy sau khi nâng cấp, webapp tự copy DB cũ từ `web/data/` sang vị trí mới.
 
 ### Bước 3 — Windows: mở webapp
 
@@ -356,6 +366,7 @@ gọi trong `experiments/kb_tool_calls.jsonl` (`kb_calls` trong bảng kết qu�
 | `429 / RESOURCE_EXHAUSTED` | Vượt TPM của Gemini 2.5 Flash | Đổi `STRIX_LLM=gemini/gemini-3-flash-preview` trong `experiments/.env` |
 | `kb_calls = 0` ở chế độ `rag` | Agent không gọi tool đúng cách | KB đã cài (mục 5); prompt trong `run_scan.sh` dùng đúng `call_mcp` + `connection='owasp_kb'`. Thử `python rag/query.py "..." --brief` để chắc index còn nguyên |
 | Không vào được webapp từ Windows | Webapp bind sai host/port | `HOST = 127.0.0.1`, `PORT` lấy từ `STRIX_WEB_PORT` (mặc định 8765); kiểm tra `curl.exe http://127.0.0.1:8765/api/settings` |
+| Mất target / lịch sử scan sau khi đổi nhánh, `git stash -a` hoặc `git clean -fdx` | DB cũ nằm trong `web/data/` (bên trong repo) nên bị Git dọn | Đã chuyển mặc định sang `~/.strix-web-data`. Nếu vẫn mất, DB cũ có thể còn trong object Git dưới dạng blob `SQLite 3.x database` (`git fsck --unreachable` rồi `git cat-file blob <hash>`), hoặc trong `experiments/runs.csv` + `experiments/strix_runs/` |
 
 ---
 

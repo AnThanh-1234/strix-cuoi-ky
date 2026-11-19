@@ -9,6 +9,7 @@ import queue
 import re
 import secrets
 import shlex
+import shutil
 import signal
 import sqlite3
 import subprocess
@@ -22,7 +23,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WEB = Path(__file__).resolve().parent
-DATA = Path(os.environ.get("STRIX_WEB_DATA", WEB / "data")).resolve()
+# Luu data ngoai repo mac dinh: doi nhanh / git clean khong the xoa lich su scan.
+DATA = Path(os.environ.get("STRIX_WEB_DATA", Path.home() / ".strix-web-data")).resolve()
+OLD_DATA = (WEB / "data").resolve()
+if not (DATA / "strix_web.sqlite3").exists() and (OLD_DATA / "strix_web.sqlite3").exists():
+    DATA.mkdir(parents=True, exist_ok=True)
+    for suffix in ("", "-wal", "-shm"):
+        old = OLD_DATA / f"strix_web.sqlite3{suffix}"
+        if old.exists():
+            shutil.copy2(old, DATA / old.name)
 DB = DATA / "strix_web.sqlite3"
 LOG_DIR = DATA / "logs"
 REPORT_DIR = DATA / "reports"
