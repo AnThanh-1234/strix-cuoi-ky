@@ -16,6 +16,13 @@ EXP="$ROOT/experiments"
 export PATH="$HOME/.local/bin:$PATH"
 
 TARGET_NAME="${1:?target: juice|dvwa|URL}"
+# Webapp doi localhost -> host.docker.internal de sandbox goi duoc host.
+# Nhan lai cac dang do thanh ten logic de van chay nhanh lab (lab.sh up + URL
+# + instruction rieng) thay vi coi nhu target ngoai.
+case "$TARGET_NAME" in
+  http://localhost:3000*|http://127.0.0.1:3000*|http://host.docker.internal:3000*) TARGET_NAME=juice ;;
+  http://localhost:8080*|http://127.0.0.1:8080*|http://host.docker.internal:8080*) TARGET_NAME=dvwa ;;
+esac
 MODE="${2:?mode: baseline|rag}"
 SCAN_MODE="${3:-standard}"
 BUDGET="${4:-3}"
@@ -29,6 +36,11 @@ set -a; . "$EXP/.env"; set +a
 export DOCKER_HOST="${DOCKER_HOST:-tcp://127.0.0.1:2375}"
 export STRIX_TELEMETRY="${STRIX_TELEMETRY:-false}"
 export STRIX_NO_UPDATE_CHECK=1
+# Mac dinh Strix chi in ERROR ra console (stderr), cac dong tien trinh chi co
+# trong strix.log -> webapp nhu khong co log den luc co ket qua.
+# STRIX_DEBUG=1 cho phep stream DEBUG log ra stderr theo thoi gian thuc.
+# (openai.agents va cac lib noisy da duoc Strix loc san, khong qua nhieu.)
+export STRIX_DEBUG="${STRIX_DEBUG:-1}"
 
 # Chi khoi dong lab khi target la juice/dvwa. Voi target ben ngoai, giu nguyên
 # cac container hien co cua nguoi dung (khong bat Juice Shop / DVWA).

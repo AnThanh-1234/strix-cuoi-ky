@@ -228,6 +228,13 @@ Log sẽ có dòng:
 Kết quả: `web/data/strix_web.sqlite3`, log ở `web/data/logs/scan-*.log`,
 run của Strix ở `experiments/strix_runs/<label>/`.
 
+> **Log cập nhật liên tục:** `run_scan.sh` đặt `STRIX_DEBUG=1`, nên Strix stream log
+> ra stderr ngay trong lúc chạy (chế độ mặc định của Strix chỉ in `ERROR`, làm webapp
+> như bị "im" đến lúc có kết quả). Các logger ồn (`openai.agents`, `httpx`, `litellm`…)
+> đã được Strix tự lọc. Webapp poll API mỗi 1,8s → log trên giao diện cập nhật theo.
+> Muốn quay lại log tĩnh: thêm `STRIX_DEBUG=0` vào `experiments/.env`.
+> Lưu ý: lượt scan đang chạy trước khi sửa này vẫn dùng log kiểu cũ.
+
 > ⚠️ Chỉ quét target bạn có quyền kiểm thử chính thức. `sv.dut.udn.vn` là site thật.
 
 ---
@@ -240,8 +247,11 @@ scripts/run_scan.sh "http://localhost:3000" baseline quick 1
 # cú pháp: run_scan.sh <target> <baseline|rag> [quick|standard|deep] [budget USD]
 ```
 
-- `juice` / `dvwa` → script sẽ gọi `scripts/lab.sh up` và khởi động lab.
-- URL bất kỳ → **không** khởi động lab.
+- `juice` / `dvwa` → script gọi `scripts/lab.sh up` và khởi động lab.
+- Các URL `http://localhost:3000`, `http://127.0.0.1:3000`, `http://host.docker.internal:3000`
+  (và cổng `8080` cho DVWA) cũng được tự nhận diện là lab → vẫn bật lab. Đây là dạng
+  webapp gửi xuống sau khi đổi `localhost` sang `host.docker.internal`.
+- URL bất kỳ khác → **không** khởi động lab.
 - Biến `DOCKER_HOST` được script tự đặt, không cần export thủ công.
 
 ---
