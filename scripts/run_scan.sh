@@ -23,10 +23,21 @@ BUDGET="${4:-3}"
 [ -f "$EXP/.env" ] || { echo "Thieu $EXP/.env (copy tu experiments/.env.example)"; exit 1; }
 set -a; . "$EXP/.env"; set +a
 : "${STRIX_LLM:?Dat STRIX_LLM trong experiments/.env}"
+# Strix dung Docker SDK (khong dung CLI) nen can DOCKER_HOST. Docker Desktop
+# mo API tren 127.0.0.1:2375 (settings-store.json) va WSL mirrored networking
+# cho phep Ubuntu truy cap localhost cua Windows.
+export DOCKER_HOST="${DOCKER_HOST:-tcp://127.0.0.1:2375}"
 export STRIX_TELEMETRY="${STRIX_TELEMETRY:-false}"
 export STRIX_NO_UPDATE_CHECK=1
 
-"$ROOT/scripts/lab.sh" up >/dev/null
+# Chi khoi dong lab khi target la juice/dvwa. Voi target ben ngoai, giu nguyên
+# cac container hien co cua nguoi dung (khong bat Juice Shop / DVWA).
+case "$TARGET_NAME" in
+  juice|dvwa) "$ROOT/scripts/lab.sh" up >/dev/null ;;
+  *)
+    docker info >/dev/null 2>&1 || { echo "Docker chua san sang (can cho Strix sandbox)"; exit 1; }
+    echo "[*] Target ngoai: bo qua lab.sh up (khong khoi dong Juice Shop/DVWA)." ;;
+esac
 
 BASE_INSTR="Authorized test of an intentionally vulnerable LAB application. Stay strictly within the given target URL; do not attack any other host."
 if [ -n "${STRIX_ADDITIONAL_INSTRUCTION:-}" ]; then
@@ -102,3 +113,6 @@ fi
 [ -f "$EXP/runs.csv" ] || echo "label,target,mode,model,scan_mode,budget,run_dir,seconds,exit_code,juice_solved_after" > "$EXP/runs.csv"
 echo "$LABEL,$TARGET_NAME,$MODE,$STRIX_LLM,$SCAN_MODE,$BUDGET,$RUN_DIR,$((END-START)),$RC,$AFTER" >> "$EXP/runs.csv"
 echo "[+] Xong sau $((END-START))s, exit=$RC, run_dir=strix_runs/$RUN_DIR (juice solved: ${BEFORE:-?} -> ${AFTER:-?})"
+# Chuyen ma thoat cua Strix ra ngoai: neu khong co dong nay, lenh echo cuoi
+# luon tra ve 0 va webapp se ghi sai thanh "Completed" du Strix that bai.
+exit "$RC"

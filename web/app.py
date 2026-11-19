@@ -218,7 +218,9 @@ def command_for(target: str, mode: str, depth: str, budget: float, instruction: 
                           text=True, encoding="utf-8", errors="replace").stdout.strip()
     command = (f"cd {shlex.quote(root)} && STRIX_ADDITIONAL_INSTRUCTION={shlex.quote(instruction)} "
                f"bash scripts/run_scan.sh {shlex.quote(target)} {mode} {depth} {budget:g}")
-    return ["wsl.exe", "bash", "-lc", command], env, None
+    # Chi dinh ro distro Ubuntu: mac dinh cua wsl.exe co the la docker-desktop
+    # (khong co bash), gay loi "/bin/sh: bash: not found" (exit 127).
+    return ["wsl.exe", "-d", "Ubuntu", "bash", "-lc", command], env, None
 
 
 def notify(scan: dict) -> None:
