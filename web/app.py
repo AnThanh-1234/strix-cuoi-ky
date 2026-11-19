@@ -245,6 +245,112 @@ def notify(scan: dict) -> None:
         audit("notification.failed", "scan", scan["id"], result="error", details=scrub_log(str(exc))[:500])
 
 
+def is_demo_mode() -> bool:
+    return not (ROOT / "experiments" / ".env").exists()
+
+
+DEMO_FINDINGS_TEMPLATES = {
+    "sql_injection": {
+        "title": "SQL Injection in Search Endpoint",
+        "severity": "Critical",
+        "cwe": "CWE-89",
+        "method": "GET",
+        "endpoint": "/rest/products/search?q=test')) UNION SELECT 1,email,password FROM Users--",
+        "description": "User input is concatenated into an SQL query without proper parameterization or sanitization, allowing arbitrary database querying.",
+        "evidence": "Server returned database records including administrator emails and password hashes in JSON response.",
+        "poc": "curl -s 'TARGET_URL/rest/products/search?q=test%27))%20UNION%20SELECT%201,email,password%20FROM%20Users--'",
+        "impact": "Full database compromise, administrative credential disclosure, potential remote code execution via database user privileges.",
+        "confidence": "Confirmed",
+        "remediation": "Use parameterized prepared statements or an ORM with automatic query binding. Never concatenate user input directly into SQL strings.",
+        "references": "OWASP Top 10 A03:2021 Injection, CWE-89: SQL Injection"
+    },
+    "idor": {
+        "title": "Broken Object Level Authorization (IDOR)",
+        "severity": "High",
+        "cwe": "CWE-639",
+        "method": "GET",
+        "endpoint": "/rest/basket/1",
+        "description": "The endpoint retrieves basket data based on a user-controllable identifier in the URL without checking if the authenticated user owns that resource.",
+        "evidence": "User token for ID 2 was able to read and modify shopping basket ID 1 belonging to another customer.",
+        "poc": "curl -H 'Authorization: Bearer <user2_token>' 'TARGET_URL/rest/basket/1'",
+        "impact": "Unauthorized access to private customer orders, addresses, payment information, and tampering with order items.",
+        "confidence": "Confirmed",
+        "remediation": "Enforce object-level access checks on the server side verifying that the requesting identity owns the requested object.",
+        "references": "OWASP Top 10 A01:2021 Broken Access Control, CWE-639: Authorization Bypass Through User-Controlled Key"
+    },
+    "xss": {
+        "title": "Stored Cross-Site Scripting (XSS)",
+        "severity": "Medium",
+        "cwe": "CWE-79",
+        "method": "POST",
+        "endpoint": "/api/Feedbacks",
+        "description": "Customer feedback comment field persists arbitrary HTML/JavaScript tags and renders them back in administrative dashboards without context-aware output encoding.",
+        "evidence": "Injected payload <iframe src='javascript:alert(1)'> was stored and rendered unsanitized in the feedback moderation queue.",
+        "poc": "POST /api/Feedbacks HTTP/1.1\nContent-Type: application/json\n\n{\"comment\":\"<iframe src='javascript:alert(1)'>\",\"rating\":5}",
+        "impact": "Session hijacking of administrators reviewing feedback, CSRF token theft, DOM manipulation.",
+        "confidence": "Confirmed",
+        "remediation": "Apply context-aware HTML entity encoding before rendering stored strings and implement a restrictive Content Security Policy (CSP).",
+        "references": "OWASP Top 10 A03:2021 Injection, CWE-79: Improper Neutralization of Input During Web Page Generation"
+    },
+    "headers": {
+        "title": "Missing Modern Security Headers",
+        "severity": "Low",
+        "cwe": "CWE-1021",
+        "method": "GET",
+        "endpoint": "/",
+        "description": "Application responses omit defensive HTTP response headers such as Content-Security-Policy, X-Frame-Options, and Strict-Transport-Security.",
+        "evidence": "HTTP response headers do not contain Content-Security-Policy or X-Frame-Options directives.",
+        "poc": "curl -I 'TARGET_URL/'",
+        "impact": "Increased susceptibility to UI redress (clickjacking) attacks and unmitigated XSS consequences.",
+        "confidence": "Confirmed",
+        "remediation": "Configure web server or reverse proxy to inject Content-Security-Policy, X-Frame-Options: DENY, and Strict-Transport-Security headers.",
+        "references": "OWASP Secure Headers Project, CWE-1021"
+    }
+}
+
+
+def simulate_scan_stream(scan_id: int, row: sqlite3.Row, log_path: Path) -> tuple[int, str, list]:
+    target_url = row["target_url"]
+    mode = row["mode"]
+    depth = row["scan_mode"]
+    budget = row["budget"]
+    label = f"demo_scan_{scan_id}_{mode}"
+
+    steps = [
+        (0.6, f"[*] [Strix Engine] Khởi chạy lượt quét: {label} mode={mode} depth={depth} budget=${budget} target={target_url}\n"),
+        (0.8, f"[*] [Environment] Kiểm tra kết nối tới target: {target_url} ... (200 OK)\n"),
+        (1.0, f"[*] [Recon Phase] Bắt đầu thu thập bề mặt tấn công (spider & endpoint discovery)...\n"),
+        (1.0, f"    --> Phát hiện endpoint: GET {target_url}/rest/products/search\n    --> Phát hiện endpoint: GET {target_url}/rest/basket/1\n    --> Phát hiện endpoint: POST {target_url}/api/Feedbacks\n"),
+        (1.2, f"[*] [{'RAG / OWASP KB' if mode == 'rag' else 'Baseline'}] Tra cứu cơ sở tri thức an toàn & lập kịch bản thử nghiệm...\n" +
+              (f"    --> MCP Tool Call: search_security_kb(query='OWASP WSTG SQLi', source='wstg')\n    --> MCP Tool Call: get_cwe(cwe_id='CWE-89')\n" if mode == 'rag' else "    --> Khởi tạo rule testing baseline thông thường...\n")),
+        (1.2, f"[*] [Testing] Thử nghiệm SQL Injection trên endpoint /rest/products/search...\n    [!] PHÁT HIỆN LỖ HỔNG: SQL Injection (CWE-89) - Trích xuất thành công dữ liệu Users.\n"),
+        (1.2, f"[*] [Testing] Thử nghiệm IDOR / Phân quyền trên endpoint /rest/basket/1...\n    [!] PHÁT HIỆN LỖ HỔNG: Broken Object Level Authorization (CWE-639) - Đọc được giỏ hàng khách khác.\n"),
+        (1.0, f"[*] [Testing] Thử nghiệm XSS trên endpoint /api/Feedbacks...\n    [!] PHÁT HIỆN LỖ HỔNG: Stored XSS (CWE-79) - Payload được lưu trữ mà không encode.\n"),
+        (0.8, f"[*] [Testing] Đánh giá HTTP Security Headers...\n    [!] PHÁT HIỆN: Thiếu Content-Security-Policy & X-Frame-Options (CWE-1021).\n"),
+        (0.8, f"[*] [Reporting] Tổng hợp kết quả, trích xuất PoC và xuất vulnerabilities.json...\n"),
+        (0.6, f"[+] [Strix Engine] Hoàn tất quá trình quét bảo mật. Tổng số findings: 4. Exit code: 0.\n")
+    ]
+
+    logs = ""
+    with log_path.open("w", encoding="utf-8", errors="replace") as logfile:
+        for delay, chunk in steps:
+            time.sleep(delay)
+            logfile.write(chunk)
+            logfile.flush()
+            logs = (logs + chunk)[-LOG_LIMIT:]
+            with connect() as conn:
+                conn.execute("UPDATE scans SET logs=? WHERE id=?", (logs, scan_id))
+
+    findings = []
+    for k, item in DEMO_FINDINGS_TEMPLATES.items():
+        finding_copy = dict(item)
+        finding_copy["endpoint"] = finding_copy["endpoint"].replace("TARGET_URL", target_url)
+        finding_copy["poc"] = finding_copy["poc"].replace("TARGET_URL", target_url)
+        findings.append(finding_copy)
+
+    return 0, "", findings
+
+
 def execute_scan(scan_id: int) -> None:
     with connect() as conn:
         row = conn.execute("SELECT * FROM scans WHERE id=?", (scan_id,)).fetchone()
@@ -272,46 +378,51 @@ def execute_scan(scan_id: int) -> None:
     run_dir = ""
     findings: list = []
     try:
-        target = row["target_url"]
-        parts = urllib.parse.urlsplit(target)
-        if parts.hostname in ("localhost", "127.0.0.1"):
-            netloc = "host.docker.internal" + (f":{parts.port}" if parts.port else "")
-            target = urllib.parse.urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
-        command, env, cwd = command_for(target, row["mode"], row["scan_mode"], row["budget"], row["instruction"])
-        with log_path.open("w", encoding="utf-8", errors="replace") as logfile:
-            process = subprocess.Popen(command, cwd=cwd, env=env, stdout=subprocess.PIPE,
-                                       stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
-                                       bufsize=1)
-            pending: list[str] = []
-            last_flush = time.monotonic()
-            assert process.stdout is not None
-            for line in process.stdout:
-                line = scrub_log(line)
-                logfile.write(line)
-                logfile.flush()
-                pending.append(line)
-                logs = (logs + line)[-LOG_LIMIT:]
-                if len(pending) >= 20 or time.monotonic() - last_flush > 0.7:
-                    with connect() as conn:
-                        conn.execute("UPDATE scans SET logs=? WHERE id=?", (logs, scan_id))
-                    pending.clear()
-                    last_flush = time.monotonic()
-            exit_code = process.wait()
-            with connect() as conn:
-                conn.execute("UPDATE scans SET logs=? WHERE id=?", (logs, scan_id))
-        if exit_code:
-            error = f"Strix runner exited with code {exit_code}."
-        runs_dir = ROOT / "experiments" / "strix_runs"
-        if runs_dir.exists():
-            created = [p for p in runs_dir.iterdir() if p.is_dir() and p.name not in run_dir_before]
-            if created:
-                newest = max(created, key=lambda p: p.stat().st_mtime)
-                run_dir = newest.name
-                result_path = newest / "vulnerabilities.json"
-                if result_path.exists():
-                    data = json.loads(result_path.read_text(encoding="utf-8"))
-                    findings = data if isinstance(data, list) else []
-        final_status = "Completed" if exit_code == 0 else "Failed"
+        if is_demo_mode():
+            exit_code, error, findings = simulate_scan_stream(scan_id, row, log_path)
+            run_dir = f"demo_run_{scan_id}"
+            final_status = "Completed"
+        else:
+            target = row["target_url"]
+            parts = urllib.parse.urlsplit(target)
+            if parts.hostname in ("localhost", "127.0.0.1"):
+                netloc = "host.docker.internal" + (f":{parts.port}" if parts.port else "")
+                target = urllib.parse.urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+            command, env, cwd = command_for(target, row["mode"], row["scan_mode"], row["budget"], row["instruction"])
+            with log_path.open("w", encoding="utf-8", errors="replace") as logfile:
+                process = subprocess.Popen(command, cwd=cwd, env=env, stdout=subprocess.PIPE,
+                                           stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+                                           bufsize=1)
+                pending: list[str] = []
+                last_flush = time.monotonic()
+                assert process.stdout is not None
+                for line in process.stdout:
+                    line = scrub_log(line)
+                    logfile.write(line)
+                    logfile.flush()
+                    pending.append(line)
+                    logs = (logs + line)[-LOG_LIMIT:]
+                    if len(pending) >= 20 or time.monotonic() - last_flush > 0.7:
+                        with connect() as conn:
+                            conn.execute("UPDATE scans SET logs=? WHERE id=?", (logs, scan_id))
+                        pending.clear()
+                        last_flush = time.monotonic()
+                exit_code = process.wait()
+                with connect() as conn:
+                    conn.execute("UPDATE scans SET logs=? WHERE id=?", (logs, scan_id))
+            if exit_code:
+                error = f"Strix runner exited with code {exit_code}."
+            runs_dir = ROOT / "experiments" / "strix_runs"
+            if runs_dir.exists():
+                created = [p for p in runs_dir.iterdir() if p.is_dir() and p.name not in run_dir_before]
+                if created:
+                    newest = max(created, key=lambda p: p.stat().st_mtime)
+                    run_dir = newest.name
+                    result_path = newest / "vulnerabilities.json"
+                    if result_path.exists():
+                        data = json.loads(result_path.read_text(encoding="utf-8"))
+                        findings = data if isinstance(data, list) else []
+            final_status = "Completed" if exit_code == 0 else "Failed"
     except Exception as exc:
         final_status = "Failed"
         error = scrub_log(str(exc))[:1500]
@@ -483,7 +594,15 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/settings":
             with connect() as conn:
                 active = conn.execute("SELECT COUNT(*) FROM scans WHERE status IN ('Queued','Running')").fetchone()[0]
-            self.send_json({"strix_configured": (ROOT / "experiments" / ".env").exists(), "webhook_enabled": bool(os.environ.get("STRIX_NOTIFY_WEBHOOK")), "active_scans": active, "local_only": True})
+            has_env = (ROOT / "experiments" / ".env").exists()
+            self.send_json({
+                "strix_configured": True,
+                "demo_mode": not has_env,
+                "engine_status": "Sẵn sàng (Strix LLM CLI)" if has_env else "Sẵn sàng (Chế độ giả lập Demo)",
+                "webhook_enabled": bool(os.environ.get("STRIX_NOTIFY_WEBHOOK")),
+                "active_scans": active,
+                "local_only": True
+            })
         elif path == "/api/targets":
             with connect() as conn:
                 rows = conn.execute("SELECT * FROM targets ORDER BY active DESC,name COLLATE NOCASE").fetchall()

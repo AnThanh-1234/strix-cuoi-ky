@@ -569,7 +569,8 @@ async function loadSettings() {
     infoEl.innerHTML = '';
 
     const rows = [
-      ['Strix cấu hình', settings.strix_configured ? '✅ Đã cấu hình' : '❌ Chưa cấu hình'],
+      ['Trạng thái Strix', settings.engine_status || (settings.strix_configured ? '✅ Sẵn sàng' : '❌ Chưa cấu hình')],
+      ['Chế độ Demo', settings.demo_mode ? '⚡ Bật (Tự động giả lập scan theo thời gian thực)' : 'Tắt (Chạy Strix CLI)'],
       ['Webhook', settings.webhook_enabled ? '✅ Bật' : '❌ Tắt'],
       ['Active scans', String(settings.active_scans ?? '—')],
       ['Chế độ local only', settings.local_only ? '✅ Có' : '❌ Không'],
